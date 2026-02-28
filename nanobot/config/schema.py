@@ -43,6 +43,7 @@ class FeishuConfig(Base):
     verification_token: str = ""  # Verification Token for event subscription (optional)
     allow_from: list[str] = Field(default_factory=list)  # Allowed user open_ids
     react_emoji: str = "THUMBSUP"  # Emoji type for message reactions (e.g. THUMBSUP, OK, DONE, SMILE)
+    use_card: bool = False  # If true, send outbound text as interactive card (lark_md).
 
 
 class DingTalkConfig(Base):
@@ -334,7 +335,10 @@ class Config(BaseSettings):
     @property
     def workspace_path(self) -> Path:
         """Get expanded workspace path."""
-        return Path(self.agents.defaults.workspace).expanduser()
+        p = Path(self.agents.defaults.workspace).expanduser()
+        if not p.is_absolute():
+            p = (Path.cwd() / p).resolve()
+        return p
 
     def _match_provider(self, model: str | None = None) -> tuple["ProviderConfig | None", str | None]:
         """Match provider config and its registry name. Returns (config, spec_name)."""

@@ -19,6 +19,8 @@ def get_data_path() -> Path:
 def get_workspace_path(workspace: str | None = None) -> Path:
     """Resolve and ensure workspace path. Defaults to ~/.nanobot/workspace."""
     path = Path(workspace).expanduser() if workspace else Path.home() / ".nanobot" / "workspace"
+    if not path.is_absolute():
+        path = (Path.cwd() / path).resolve()
     return ensure_dir(path)
 
 

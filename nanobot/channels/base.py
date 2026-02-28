@@ -1,6 +1,7 @@
 """Base channel interface for chat platforms."""
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -19,7 +20,7 @@ class BaseChannel(ABC):
     
     name: str = "base"
     
-    def __init__(self, config: Any, bus: MessageBus):
+    def __init__(self, config: Any, bus: MessageBus, workspace: Path):
         """
         Initialize the channel.
         
@@ -29,6 +30,7 @@ class BaseChannel(ABC):
         """
         self.config = config
         self.bus = bus
+        self.workspace = workspace
         self._running = False
     
     @abstractmethod

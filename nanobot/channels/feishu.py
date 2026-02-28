@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import re
+import threading
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any
@@ -259,8 +260,8 @@ class FeishuChannel(BaseChannel):
     
     name = "feishu"
     
-    def __init__(self, config: FeishuConfig, bus: MessageBus):
-        super().__init__(config, bus)
+    def __init__(self, config: FeishuConfig, bus: MessageBus, workspace: Path):
+        super().__init__(config, bus, workspace)
         self.config: FeishuConfig = config
         self._client: Any = None
         self._ws_client: Any = None
@@ -563,10 +564,7 @@ class FeishuChannel(BaseChannel):
         # - InboundMessage.media can reference local files
         # - the `media` tool can query them via cache/media/index.jsonl
         #
-        # Note: ChannelManager does not currently pass workspace into channels, so we
-        # infer the default workspace (~/.nanobot/workspace), which matches current deploy.
-        workspace = Path.home() / ".nanobot" / "workspace"
-        cache = MediaCache(workspace)
+        cache = MediaCache(self.workspace)
 
         data, filename = None, None
 
@@ -666,14 +664,29 @@ class FeishuChannel(BaseChannel):
                         )
 
             if msg.content and msg.content.strip():
-                await loop.run_in_executor(
-                    None,
-                    self._send_message_sync,
-                    receive_id_type,
-                    msg.chat_id,
-                    "text",
-                    json.dumps({"text": msg.content}, ensure_ascii=False),
-                )
+                if getattr(self.config, "use_card", False):
+                    elements = self._build_card_elements(msg.content)
+                    card = {
+                        "config": {"wide_screen_mode": True},
+                        "elements": elements,
+                    }
+                    await loop.run_in_executor(
+                        None,
+                        self._send_message_sync,
+                        receive_id_type,
+                        msg.chat_id,
+                        "interactive",
+                        json.dumps({"card": card}, ensure_ascii=False),
+                    )
+                else:
+                    await loop.run_in_executor(
+                        None,
+                        self._send_message_sync,
+                        receive_id_type,
+                        msg.chat_id,
+                        "text",
+                        json.dumps({"text": msg.content}, ensure_ascii=False),
+                    )
 
         except Exception as e:
             logger.error("Error sending Feishu message: {}", e)

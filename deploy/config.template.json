@@ -43,7 +43,8 @@
       "encryptKey": "B9Daf0rzLlFpM32QmlQRqgiwPhcGKp5Z",
       "verificationToken": "L2LS4DIef2ILm1uqWBBkxdMz1VUifyVA",
       "allowFrom": [],
-      "reactEmoji": "Get"
+      "reactEmoji": "Get",
+      "useCard": true
     },
     "mochat": {
       "enabled": false,

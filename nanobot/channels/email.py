@@ -1,11 +1,13 @@
 """Email channel implementation using IMAP polling + SMTP replies."""
 
 import asyncio
-import html
+import email
 import imaplib
 import re
 import smtplib
-import ssl
+from email.message import EmailMessage
+from typing import Any
+from pathlib import Path
 from datetime import date
 from email import policy
 from email.header import decode_header, make_header
@@ -50,8 +52,8 @@ class EmailChannel(BaseChannel):
         "Dec",
     )
 
-    def __init__(self, config: EmailConfig, bus: MessageBus):
-        super().__init__(config, bus)
+    def __init__(self, config: EmailConfig, bus: MessageBus, workspace: Path):
+        super().__init__(config, bus, workspace)
         self.config: EmailConfig = config
         self._last_subject_by_chat: dict[str, str] = {}
         self._last_message_id_by_chat: dict[str, str] = {}

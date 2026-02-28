@@ -12,6 +12,7 @@ from nanobot.bus.events import OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.channels.base import BaseChannel
 from nanobot.config.schema import DingTalkConfig
+from pathlib import Path
 
 try:
     from dingtalk_stream import (
@@ -97,8 +98,8 @@ class DingTalkChannel(BaseChannel):
 
     name = "dingtalk"
 
-    def __init__(self, config: DingTalkConfig, bus: MessageBus):
-        super().__init__(config, bus)
+    def __init__(self, config: DingTalkConfig, bus: MessageBus, workspace: Path):
+        super().__init__(config, bus, workspace)
         self.config: DingTalkConfig = config
         self._client: Any = None
         self._http: httpx.AsyncClient | None = None

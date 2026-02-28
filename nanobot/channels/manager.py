@@ -33,6 +33,8 @@ class ChannelManager:
     
     def _init_channels(self) -> None:
         """Initialize channels based on config."""
+
+        workspace = self.config.workspace_path
         
         # Telegram channel
         if self.config.channels.telegram.enabled:
@@ -41,6 +43,7 @@ class ChannelManager:
                 self.channels["telegram"] = TelegramChannel(
                     self.config.channels.telegram,
                     self.bus,
+                    workspace,
                     groq_api_key=self.config.providers.groq.api_key,
                 )
                 logger.info("Telegram channel enabled")
@@ -52,7 +55,7 @@ class ChannelManager:
             try:
                 from nanobot.channels.whatsapp import WhatsAppChannel
                 self.channels["whatsapp"] = WhatsAppChannel(
-                    self.config.channels.whatsapp, self.bus
+                    self.config.channels.whatsapp, self.bus, workspace
                 )
                 logger.info("WhatsApp channel enabled")
             except ImportError as e:
@@ -63,7 +66,7 @@ class ChannelManager:
             try:
                 from nanobot.channels.discord import DiscordChannel
                 self.channels["discord"] = DiscordChannel(
-                    self.config.channels.discord, self.bus
+                    self.config.channels.discord, self.bus, workspace
                 )
                 logger.info("Discord channel enabled")
             except ImportError as e:
@@ -74,7 +77,7 @@ class ChannelManager:
             try:
                 from nanobot.channels.feishu import FeishuChannel
                 self.channels["feishu"] = FeishuChannel(
-                    self.config.channels.feishu, self.bus
+                    self.config.channels.feishu, self.bus, workspace
                 )
                 logger.info("Feishu channel enabled")
             except ImportError as e:
@@ -86,7 +89,7 @@ class ChannelManager:
                 from nanobot.channels.mochat import MochatChannel
 
                 self.channels["mochat"] = MochatChannel(
-                    self.config.channels.mochat, self.bus
+                    self.config.channels.mochat, self.bus, workspace
                 )
                 logger.info("Mochat channel enabled")
             except ImportError as e:
@@ -97,7 +100,7 @@ class ChannelManager:
             try:
                 from nanobot.channels.dingtalk import DingTalkChannel
                 self.channels["dingtalk"] = DingTalkChannel(
-                    self.config.channels.dingtalk, self.bus
+                    self.config.channels.dingtalk, self.bus, workspace
                 )
                 logger.info("DingTalk channel enabled")
             except ImportError as e:
@@ -108,7 +111,7 @@ class ChannelManager:
             try:
                 from nanobot.channels.email import EmailChannel
                 self.channels["email"] = EmailChannel(
-                    self.config.channels.email, self.bus
+                    self.config.channels.email, self.bus, workspace
                 )
                 logger.info("Email channel enabled")
             except ImportError as e:
@@ -119,7 +122,7 @@ class ChannelManager:
             try:
                 from nanobot.channels.slack import SlackChannel
                 self.channels["slack"] = SlackChannel(
-                    self.config.channels.slack, self.bus
+                    self.config.channels.slack, self.bus, workspace
                 )
                 logger.info("Slack channel enabled")
             except ImportError as e:
@@ -132,6 +135,7 @@ class ChannelManager:
                 self.channels["qq"] = QQChannel(
                     self.config.channels.qq,
                     self.bus,
+                    workspace,
                 )
                 logger.info("QQ channel enabled")
             except ImportError as e:
@@ -144,6 +148,7 @@ class ChannelManager:
                 self.channels["matrix"] = MatrixChannel(
                     self.config.channels.matrix,
                     self.bus,
+                    workspace,
                 )
                 logger.info("Matrix channel enabled")
             except ImportError as e:

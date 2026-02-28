@@ -309,6 +309,19 @@ class AgentLoop:
         )
         return any(p in t for p in patterns)
 
+    @staticmethod
+    def _is_image_only_prompt(text: str) -> bool:
+        """Return True if the user message contains no meaningful text besides image placeholders."""
+        t = (text or "").strip()
+        if not t:
+            return True
+
+        # Common placeholders in channel session logs.
+        t = t.replace("[image]", "").strip()
+        t = re.sub(r"\[image:\s*[^\]]+\]", "", t).strip()
+        t = re.sub(r"\s+", " ", t).strip()
+        return not t
+
     async def _run_agent_loop(
         self,
         initial_messages: list[dict],
@@ -743,19 +756,23 @@ class AgentLoop:
             if isinstance(message_tool, MessageTool):
                 message_tool.start_turn()
 
+        effective_message = msg.content
+        if msg.media and self._is_image_only_prompt(msg.content):
+            effective_message = "解释图片中的内容"
+
         async def _build(extra_system_prompt: str | None) -> list[dict]:
             history = await self._compact_context_if_needed(
                 session=session,
                 session_key=key,
                 channel=msg.channel,
                 chat_id=msg.chat_id,
-                current_message=msg.content,
+                current_message=effective_message,
                 media=msg.media if msg.media else None,
                 extra_system_prompt=extra_system_prompt,
             )
             return self.context.build_messages(
                 history=history,
-                current_message=msg.content,
+                current_message=effective_message,
                 media=msg.media if msg.media else None,
                 channel=msg.channel,
                 chat_id=msg.chat_id,

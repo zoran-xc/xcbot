@@ -7,6 +7,7 @@ import json
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -217,8 +218,8 @@ class MochatChannel(BaseChannel):
 
     name = "mochat"
 
-    def __init__(self, config: MochatConfig, bus: MessageBus):
-        super().__init__(config, bus)
+    def __init__(self, config: MochatConfig, bus: MessageBus, workspace: Path):
+        super().__init__(config, bus, workspace)
         self.config: MochatConfig = config
         self._http: httpx.AsyncClient | None = None
         self._socket: Any = None

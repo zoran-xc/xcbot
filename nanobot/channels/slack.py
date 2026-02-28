@@ -2,6 +2,7 @@
 
 import asyncio
 import re
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -23,8 +24,8 @@ class SlackChannel(BaseChannel):
 
     name = "slack"
 
-    def __init__(self, config: SlackConfig, bus: MessageBus):
-        super().__init__(config, bus)
+    def __init__(self, config: SlackConfig, bus: MessageBus, workspace: Path):
+        super().__init__(config, bus, workspace)
         self.config: SlackConfig = config
         self._web_client: AsyncWebClient | None = None
         self._socket_client: SocketModeClient | None = None
