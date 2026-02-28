@@ -94,7 +94,7 @@ class MCPToolWrapper(Tool):
 
         if isinstance(data, (bytes, bytearray)):
             try:
-                path = self._media.save_bytes(data, ext=ext, prefix=self._name)
+                path = self._media.save_bytes(bytes(data), ext=ext, prefix=self._name, mime=str(mime), source="mcp")
                 return f"[image saved: {path}]"
             except Exception as e:
                 logger.warning("MCP tool '{}': failed to write ImageContent file: {}", self._name, e)
@@ -103,7 +103,7 @@ class MCPToolWrapper(Tool):
         if isinstance(data, str):
             b64 = data.strip().replace("\n", "").replace("\r", "")
             try:
-                path = self._media.save_base64(b64, ext=ext, prefix=self._name)
+                path = self._media.save_base64(b64, ext=ext, prefix=self._name, mime=str(mime), source="mcp")
                 return f"[image saved: {path}]"
             except Exception as e:
                 logger.warning("MCP tool '{}': failed to decode/write ImageContent base64: {}", self._name, e)
@@ -152,7 +152,7 @@ class MCPToolWrapper(Tool):
             if not b64:
                 return ""
             try:
-                path = self._media.save_base64(b64, ext=ext, prefix=self._name)
+                path = self._media.save_base64(b64, ext=ext, prefix=self._name, mime=f"image/{ext}", source="mcp")
                 return f"[image saved: {path}]"
             except Exception as e:
                 logger.warning("MCP tool '{}': failed to decode/write inline image base64: {}", self._name, e)

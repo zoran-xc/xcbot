@@ -120,6 +120,10 @@ class AgentLoop:
         self.tools.register(WebFetchTool())
         self.tools.register(MessageTool(send_callback=self.bus.publish_outbound))
         self.tools.register(SpawnTool(manager=self.subagents))
+        from nanobot.agent.tools.media import MediaTool
+        self.tools.register(MediaTool(workspace=self.workspace))
+        from nanobot.agent.tools.session_tools import SessionTool
+        self.tools.register(SessionTool(workspace=self.workspace))
         if self.cron_service:
             self.tools.register(CronTool(self.cron_service))
 
