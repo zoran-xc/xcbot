@@ -51,6 +51,7 @@ class AgentLoop:
         provider: LLMProvider,
         workspace: Path,
         model: str | None = None,
+        vision_model: str | None = None,
         max_iterations: int = 40,
         temperature: float = 0.1,
         max_tokens: int = 4096,
@@ -69,6 +70,7 @@ class AgentLoop:
         self.provider = provider
         self.workspace = workspace
         self.model = model or provider.get_default_model()
+        self.vision_model = vision_model
         self.max_iterations = max_iterations
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -173,6 +175,17 @@ class AgentLoop:
             return f'{tc.name}("{val[:40]}…")' if len(val) > 40 else f'{tc.name}("{val}")'
         return ", ".join(_fmt(tc) for tc in tool_calls)
 
+    @staticmethod
+    def _has_image_input(messages: list[dict]) -> bool:
+        """Return True if any message content contains an OpenAI-style image_url block."""
+        for msg in messages:
+            content = msg.get("content")
+            if isinstance(content, list):
+                for item in content:
+                    if isinstance(item, dict) and item.get("type") == "image_url":
+                        return True
+        return False
+
     async def _run_agent_loop(
         self,
         initial_messages: list[dict],
@@ -187,10 +200,22 @@ class AgentLoop:
         while iteration < self.max_iterations:
             iteration += 1
 
+            model = self.model
+            if self._has_image_input(messages):
+                vision_model = getattr(self, "vision_model", None)
+                if not vision_model:
+                    return (
+                        "Error: this request includes an image, but no vision model is configured. "
+                        "Please set agents.defaults.visionModel in config.json.",
+                        tools_used,
+                        messages,
+                    )
+                model = vision_model
+
             response = await self.provider.chat(
                 messages=messages,
                 tools=self.tools.get_definitions(),
-                model=self.model,
+                model=model,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
             )

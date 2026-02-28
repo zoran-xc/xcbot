@@ -742,7 +742,22 @@ class FeishuChannel(BaseChannel):
             content = "\n".join(content_parts) if content_parts else ""
 
             if not content and not media_paths:
-                return
+                if msg_type in ("text", "post", "interactive"):
+                    logger.debug(
+                        "Feishu inbound message parsed empty (type={}), forwarding placeholder. message_id={} chat_type={}",
+                        msg_type,
+                        message_id,
+                        chat_type,
+                    )
+                    content = MSG_TYPE_MAP.get(msg_type, f"[{msg_type}]")
+                else:
+                    logger.debug(
+                        "Feishu inbound message ignored due to empty content/media (type={}). message_id={} chat_type={}",
+                        msg_type,
+                        message_id,
+                        chat_type,
+                    )
+                    return
 
             # Forward to message bus
             reply_to = chat_id if chat_type == "group" else sender_id
