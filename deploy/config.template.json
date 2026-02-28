@@ -251,7 +251,7 @@
         "command": "",
         "args": [],
         "env": {},
-        "url": "http://host.docker.internal:18060/mcp",
+        "url": "http://127.0.0.1:18060/mcp",
         "headers": {},
         "toolTimeout": 120
       }
