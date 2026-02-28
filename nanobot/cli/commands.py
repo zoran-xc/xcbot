@@ -295,8 +295,19 @@ def gateway(
     # Set cron callback (needs agent)
     async def on_cron_job(job: CronJob) -> str | None:
         """Execute a cron job through the agent."""
+        from datetime import datetime
+        now = datetime.now().isoformat(timespec="seconds")
+        injected = (
+            "这是一个【定时任务到期触发】事件，不是用户刚刚发来的新消息。\n\n"
+            "原对话摘录（供你理解用户意图）：(请根据上下文/任务内容自行补全，若无上下文则忽略)\n"
+            f"- {job.payload.message}\n\n"
+            f"触发信息：job_id={job.id} | triggered_at={now}\n\n"
+            "本次需要你做的事情：\n"
+            f"- {job.payload.message}\n\n"
+            "请直接输出最终要发给用户的内容（简短明确），不要自我对话，也不要调用 cron 工具。\n"
+        )
         response = await agent.process_direct(
-            job.payload.message,
+            injected,
             session_key=f"cron:{job.id}",
             channel=job.payload.channel or "cli",
             chat_id=job.payload.to or "direct",
