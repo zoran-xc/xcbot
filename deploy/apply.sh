@@ -46,8 +46,6 @@ else
   echo "Code unchanged, skip build."
 fi
 
-docker compose -f "$ROOT_DIR/docker-compose.yml" up -d nanobot-gateway >/dev/null
-
-docker compose -f "$ROOT_DIR/docker-compose.yml" restart nanobot-gateway >/dev/null
+docker compose -f "$ROOT_DIR/docker-compose.yml" up -d --force-recreate nanobot-gateway >/dev/null
 
 docker compose -f "$ROOT_DIR/docker-compose.yml" run --rm nanobot-cli status
