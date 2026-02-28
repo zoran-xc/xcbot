@@ -6,6 +6,7 @@ import asyncio
 import json
 import re
 from contextlib import AsyncExitStack
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
@@ -14,6 +15,8 @@ from loguru import logger
 from nanobot.agent.context import ContextBuilder
 from nanobot.agent.memory import MemoryStore
 from nanobot.agent.subagent import SubagentManager
+from nanobot.agent.plan_header import PLAN_RULES, parse_plan_header
+from nanobot.agent.task_anchor import TaskAnchorEntry, TaskAnchorStore
 from nanobot.agent.tools.cron import CronTool
 from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
 from nanobot.agent.tools.message import MessageTool
@@ -23,6 +26,7 @@ from nanobot.agent.tools.spawn import SpawnTool
 from nanobot.agent.tools.web import WebFetchTool, WebSearchTool
 from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.bus.queue import MessageBus
+from nanobot.agent.retry_policy import AttemptTrace, build_failure_bundle, classify_error_message
 from nanobot.providers.base import LLMProvider
 from nanobot.session.manager import Session, SessionManager
 
@@ -44,6 +48,13 @@ class AgentLoop:
     """
 
     _TOOL_RESULT_MAX_CHARS = 500
+
+    @dataclass
+    class _AttemptOutcome:
+        final_content: str | None
+        tools_used: list[str]
+        messages: list[dict]
+        error_message: str | None = None
 
     def __init__(
         self,
@@ -105,6 +116,7 @@ class AgentLoop:
         self._consolidation_locks: dict[str, asyncio.Lock] = {}
         self._active_tasks: dict[str, list[asyncio.Task]] = {}  # session_key -> tasks
         self._processing_lock = asyncio.Lock()
+        self._task_anchors = TaskAnchorStore(self.workspace)
         self._register_default_tools()
 
     def _register_default_tools(self) -> None:
@@ -122,6 +134,8 @@ class AgentLoop:
         self.tools.register(WebFetchTool())
         self.tools.register(MessageTool(send_callback=self.bus.publish_outbound))
         self.tools.register(SpawnTool(manager=self.subagents))
+        from nanobot.agent.tools.tasks import TasksTool
+        self.tools.register(TasksTool(manager=self.subagents))
         from nanobot.agent.tools.media import MediaTool
         self.tools.register(MediaTool(workspace=self.workspace))
         from nanobot.agent.tools.session_tools import SessionTool
@@ -153,7 +167,7 @@ class AgentLoop:
 
     def _set_tool_context(self, channel: str, chat_id: str, message_id: str | None = None) -> None:
         """Update context for all tools that need routing info."""
-        for name in ("message", "spawn", "cron"):
+        for name in ("message", "spawn", "tasks", "cron"):
             if tool := self.tools.get(name):
                 if hasattr(tool, "set_context"):
                     tool.set_context(channel, chat_id, *([message_id] if name == "message" else []))
@@ -191,10 +205,26 @@ class AgentLoop:
         initial_messages: list[dict],
         on_progress: Callable[..., Awaitable[None]] | None = None,
     ) -> tuple[str | None, list[str], list[dict]]:
-        """Run the agent iteration loop. Returns (final_content, tools_used, messages)."""
+        """Run the agent loop with multi-stage retries.
+
+        This keeps the public signature stable for existing call sites. For richer
+        retry behavior (AI retries w/ FailureBundle), callers should use
+        _run_with_retries() via _process_message.
+        """
+
+        outcome = await self._run_single_attempt(initial_messages, on_progress=on_progress)
+        return outcome.final_content, outcome.tools_used, outcome.messages
+
+    async def _run_single_attempt(
+        self,
+        initial_messages: list[dict],
+        *,
+        on_progress: Callable[..., Awaitable[None]] | None = None,
+    ) -> _AttemptOutcome:
+        """Run a single attempt of the tool-iteration loop."""
         messages = initial_messages
         iteration = 0
-        final_content = None
+        final_content: str | None = None
         tools_used: list[str] = []
 
         while iteration < self.max_iterations:
@@ -204,21 +234,32 @@ class AgentLoop:
             if self._has_image_input(messages):
                 vision_model = getattr(self, "vision_model", None)
                 if not vision_model:
-                    return (
-                        "Error: this request includes an image, but no vision model is configured. "
-                        "Please set agents.defaults.visionModel in config.json.",
-                        tools_used,
-                        messages,
+                    return self._AttemptOutcome(
+                        final_content=(
+                            "Error: this request includes an image, but no vision model is configured. "
+                            "Please set agents.defaults.visionModel in config.json."
+                        ),
+                        tools_used=tools_used,
+                        messages=messages,
+                        error_message="vision model not configured",
                     )
                 model = vision_model
 
-            response = await self.provider.chat(
-                messages=messages,
-                tools=self.tools.get_definitions(),
-                model=model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
+            try:
+                response = await self.provider.chat(
+                    messages=messages,
+                    tools=self.tools.get_definitions(),
+                    model=model,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                )
+            except Exception as e:
+                return self._AttemptOutcome(
+                    final_content=None,
+                    tools_used=tools_used,
+                    messages=messages,
+                    error_message=str(e),
+                )
 
             if response.has_tool_calls:
                 if on_progress:
@@ -233,13 +274,15 @@ class AgentLoop:
                         "type": "function",
                         "function": {
                             "name": tc.name,
-                            "arguments": json.dumps(tc.arguments, ensure_ascii=False)
-                        }
+                            "arguments": json.dumps(tc.arguments, ensure_ascii=False),
+                        },
                     }
                     for tc in response.tool_calls
                 ]
                 messages = self.context.add_assistant_message(
-                    messages, response.content, tool_call_dicts,
+                    messages,
+                    response.content,
+                    tool_call_dicts,
                     reasoning_content=response.reasoning_content,
                 )
 
@@ -247,14 +290,15 @@ class AgentLoop:
                     tools_used.append(tool_call.name)
                     args_str = json.dumps(tool_call.arguments, ensure_ascii=False)
                     logger.info("Tool call: {}({})", tool_call.name, args_str[:200])
+                    # ToolRegistry.execute already catches exceptions and returns an error string.
                     result = await self.tools.execute(tool_call.name, tool_call.arguments)
-                    messages = self.context.add_tool_result(
-                        messages, tool_call.id, tool_call.name, result
-                    )
+                    messages = self.context.add_tool_result(messages, tool_call.id, tool_call.name, result)
             else:
                 clean = self._strip_think(response.content)
                 messages = self.context.add_assistant_message(
-                    messages, clean, reasoning_content=response.reasoning_content,
+                    messages,
+                    clean,
+                    reasoning_content=response.reasoning_content,
                 )
                 final_content = clean
                 break
@@ -266,7 +310,122 @@ class AgentLoop:
                 "without completing the task. You can try breaking the task into smaller steps."
             )
 
-        return final_content, tools_used, messages
+        return self._AttemptOutcome(
+            final_content=final_content,
+            tools_used=tools_used,
+            messages=messages,
+        )
+
+    async def _run_with_retries(
+        self,
+        *,
+        build_messages: Callable[[str | None], list[dict]],
+        on_progress: Callable[..., Awaitable[None]] | None,
+    ) -> tuple[str | None, list[str], list[dict], list[AttemptTrace]]:
+        """Run attempts with policy:
+
+        - normal attempt
+        - system mechanical retries x2
+        - AI retries w/ FailureBundle injection x2
+        """
+
+        traces: list[AttemptTrace] = []
+        tools_used_acc: list[str] = []
+
+        async def _notify(text: str) -> None:
+            if on_progress:
+                await on_progress(text)
+
+        def _mk_trace(stage: str, index: int, ok: bool, error_message: str | None, final: str | None, tools: list[str], started_at: float):
+            error_type = classify_error_message(error_message or "") if not ok else None
+            return AttemptTrace(
+                stage=stage,  # type: ignore[arg-type]
+                index=index,
+                started_at=started_at,
+                ok=ok,
+                error_type=error_type,
+                error_message=error_message,
+                final_content=final,
+                tools_used=list(tools),
+            )
+
+        # Phase 1: normal + system mechanical retries (no prompt mutation)
+        last_outcome: AgentLoop._AttemptOutcome | None = None
+        last_messages: list[dict] | None = None
+
+        for i in range(1 + 2):
+            stage = "normal" if i == 0 else "system_retry"
+            if i == 1:
+                await _notify("【系统】检测到任务执行异常，将进行自动重试（系统重试 1/2）。")
+            if i == 2:
+                await _notify("【系统】系统重试仍未成功，将继续自动重试（系统重试 2/2）。")
+
+            started_at = asyncio.get_event_loop().time()
+            msgs = build_messages(None)
+            last_messages = msgs
+            outcome = await self._run_single_attempt(msgs, on_progress=on_progress)
+            last_outcome = outcome
+            tools_used_acc.extend(outcome.tools_used)
+            ok = outcome.final_content is not None and outcome.error_message is None
+            traces.append(
+                _mk_trace(stage, i, ok, outcome.error_message, outcome.final_content, outcome.tools_used, started_at)
+            )
+            if ok:
+                return outcome.final_content, tools_used_acc, outcome.messages, traces
+
+        # Phase 2: AI retries with FailureBundle prompt injection
+        assert last_outcome is not None
+        bundle = build_failure_bundle(traces, last_outcome.messages)
+        extra_prompt = bundle.to_prompt_block()
+
+        for j in range(2):
+            await _notify(
+                "【系统】自动重试未成功，我将整理失败信息并再次尝试（反思重试 {}/2）。".format(j + 1)
+            )
+            started_at = asyncio.get_event_loop().time()
+            msgs = build_messages(extra_prompt)
+            last_messages = msgs
+            outcome = await self._run_single_attempt(msgs, on_progress=on_progress)
+            last_outcome = outcome
+            tools_used_acc.extend(outcome.tools_used)
+            ok = outcome.final_content is not None and outcome.error_message is None
+            traces.append(
+                _mk_trace("ai_retry", j, ok, outcome.error_message, outcome.final_content, outcome.tools_used, started_at)
+            )
+            if ok:
+                return outcome.final_content, tools_used_acc, outcome.messages, traces
+
+        # Stop
+        await _notify("【系统】多次自动重试仍失败，将停止任务并请求人工介入。")
+        final_msg = (
+            "任务执行出现问题，需要人工干预。\n\n"
+            "我已经进行了系统重试 2 次 + 反思重试 2 次，仍未成功。\n"
+            "你可以：\n"
+            "1) 提供报错信息/期望结果的更多细节；\n"
+            "2) 使用 /new 开启新会话重试；\n"
+            "3) 使用 /stop 终止当前任务。"
+        )
+        return final_msg, tools_used_acc, (last_messages or []), traces
+
+    def _try_append_task_anchor(self, session_key: str, final_content: str | None) -> None:
+        if not final_content:
+            return
+        plan = parse_plan_header(final_content)
+        if not plan:
+            return
+        from datetime import datetime
+        entry = TaskAnchorEntry(
+            session_key=session_key,
+            timestamp=datetime.now().isoformat(),
+            goal=plan.goal,
+            steps=plan.steps,
+            next_step=plan.next_step,
+            raw=final_content[:800],
+        )
+        try:
+            self._task_anchors.append(entry)
+        except Exception as e:
+            logger.debug("Failed to append task anchor for {}: {}", session_key, e)
 
     async def run(self) -> None:
         """Run the agent loop, dispatching messages as tasks to stay responsive to /stop."""
@@ -355,12 +514,29 @@ class AgentLoop:
             session = self.sessions.get_or_create(key)
             self._set_tool_context(channel, chat_id, msg.metadata.get("message_id"))
             history = session.get_history(max_messages=self.memory_window)
-            messages = self.context.build_messages(
-                history=history,
-                current_message=msg.content, channel=channel, chat_id=chat_id,
+            def _build(extra_system_prompt: str | None) -> list[dict]:
+                return self.context.build_messages(
+                    history=history,
+                    current_message=msg.content,
+                    channel=channel,
+                    chat_id=chat_id,
+                    extra_system_prompt=extra_system_prompt,
+                )
+
+            final_content, tools_used, all_msgs, traces = await self._run_with_retries(
+                build_messages=_build,
+                on_progress=on_progress,
             )
-            final_content, _, all_msgs = await self._run_agent_loop(messages)
+            self._try_append_task_anchor(key, final_content)
             self._save_turn(session, all_msgs, 1 + len(history))
+            if traces and any(not t.ok for t in traces) and final_content and "人工干预" not in final_content:
+                await MemoryStore(self.workspace).record_task_lesson(
+                    session=session,
+                    provider=self.provider,
+                    model=self.model,
+                    final_content=final_content,
+                    traces=traces,
+                )
             self.sessions.save(session)
             return OutboundMessage(channel=channel, chat_id=chat_id,
                                   content=final_content or "Background task completed.")
@@ -433,12 +609,15 @@ class AgentLoop:
                 message_tool.start_turn()
 
         history = session.get_history(max_messages=self.memory_window)
-        initial_messages = self.context.build_messages(
-            history=history,
-            current_message=msg.content,
-            media=msg.media if msg.media else None,
-            channel=msg.channel, chat_id=msg.chat_id,
-        )
+        def _build(extra_system_prompt: str | None) -> list[dict]:
+            return self.context.build_messages(
+                history=history,
+                current_message=msg.content,
+                media=msg.media if msg.media else None,
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                extra_system_prompt=extra_system_prompt,
+            )
 
         async def _bus_progress(content: str, *, tool_hint: bool = False) -> None:
             meta = dict(msg.metadata or {})
@@ -448,14 +627,25 @@ class AgentLoop:
                 channel=msg.channel, chat_id=msg.chat_id, content=content, metadata=meta,
             ))
 
-        final_content, _, all_msgs = await self._run_agent_loop(
-            initial_messages, on_progress=on_progress or _bus_progress,
+        final_content, tools_used, all_msgs, traces = await self._run_with_retries(
+            build_messages=_build,
+            on_progress=on_progress or _bus_progress,
         )
+
+        self._try_append_task_anchor(key, final_content)
 
         if final_content is None:
             final_content = "I've completed processing but have no response to give."
 
         self._save_turn(session, all_msgs, 1 + len(history))
+        if traces and any(not t.ok for t in traces) and final_content and "人工干预" not in final_content:
+            await MemoryStore(self.workspace).record_task_lesson(
+                session=session,
+                provider=self.provider,
+                model=self.model,
+                final_content=final_content,
+                traces=traces,
+            )
         self.sessions.save(session)
 
         if (mt := self.tools.get("message")) and isinstance(mt, MessageTool) and mt._sent_in_turn:

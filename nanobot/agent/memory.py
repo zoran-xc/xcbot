@@ -42,6 +42,48 @@ _SAVE_MEMORY_TOOL = [
 ]
 
 
+_SAVE_TASK_LEARNING_TOOL = [
+    {
+        "type": "function",
+        "function": {
+            "name": "save_task_learning",
+            "description": "Save task learning to history/memory and optionally create/update a skill.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "history_entry": {
+                        "type": "string",
+                        "description": "A paragraph (2-5 sentences) summarizing what happened and how it was resolved. Start with [YYYY-MM-DD HH:MM].",
+                    },
+                    "memory_update": {
+                        "type": "string",
+                        "description": "Full updated long-term memory markdown. Return unchanged if nothing new.",
+                    },
+                    "should_write_skill": {
+                        "type": "boolean",
+                        "description": "Whether to write a reusable skill. Only true if criteria are met.",
+                    },
+                    "skill_name": {
+                        "type": "string",
+                        "description": "Skill directory name to write under workspace/skills/<skill_name>/SKILL.md",
+                    },
+                    "skill_markdown": {
+                        "type": "string",
+                        "description": "Full SKILL.md contents (including YAML frontmatter if needed).",
+                    },
+                    "when_to_use": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Short bullet conditions when this skill applies.",
+                    },
+                },
+                "required": ["history_entry", "memory_update", "should_write_skill"],
+            },
+        },
+    }
+]
+
+
 class MemoryStore:
     """Two-layer memory: MEMORY.md (long-term facts) + HISTORY.md (grep-searchable log)."""
 
@@ -143,8 +185,115 @@ class MemoryStore:
                     self.write_long_term(update)
 
             session.last_consolidated = 0 if archive_all else len(session.messages) - keep_count
-            logger.info("Memory consolidation done: {} messages, last_consolidated={}", len(session.messages), session.last_consolidated)
+            logger.info(
+                "Memory consolidation done: {} messages, last_consolidated={}",
+                len(session.messages),
+                session.last_consolidated,
+            )
             return True
         except Exception:
             logger.exception("Memory consolidation failed")
+            return False
+
+    async def record_task_lesson(
+        self,
+        *,
+        session: "Session",
+        provider: "LLMProvider",
+        model: str,
+        final_content: str,
+        traces: list[object],
+    ) -> bool:
+        """Record task outcome after multi-stage retries.
+
+        The model decides whether to:
+        - Append a HISTORY entry
+        - Update MEMORY.md
+        - Optionally write a workspace skill for reusable patterns
+        """
+
+        try:
+            trace_lines: list[str] = []
+            for t in traces[-6:]:
+                stage = getattr(t, "stage", "?")
+                idx = getattr(t, "index", "?")
+                ok = getattr(t, "ok", False)
+                et = getattr(t, "error_type", None)
+                em = getattr(t, "error_message", "")
+                msg = str(em).replace("\n", " ")
+                if len(msg) > 240:
+                    msg = msg[:237] + "..."
+                trace_lines.append(f"- stage={stage} index={idx} ok={ok} errorType={et} err={msg}")
+
+            current_memory = self.read_long_term()
+            criteria = (
+                "Skill write criteria (only set should_write_skill=true if >=2 are met):\n"
+                "- High repeatability: likely to recur in future\n"
+                "- Fixed, template-able steps\n"
+                "- Common failure patterns encountered (retries were needed)\n"
+                "- Clear verification steps\n"
+                "- Security/compliance constraints worth documenting\n\n"
+                "Do NOT write a skill if: one-off task, highly context-dependent, creative-only, or unstable/unreliable outcome."
+            )
+
+            prompt = (
+                "You are nanobot's task learning recorder.\n\n"
+                "Goals:\n"
+                "1) Always produce a grep-friendly HISTORY entry (2-5 sentences).\n"
+                "2) Update long-term MEMORY only for stable facts/preferences/constraints.\n"
+                "3) Optionally write a reusable skill only when criteria are met.\n\n"
+                + criteria
+                + "\n## Current Long-term Memory\n"
+                + (current_memory or "(empty)")
+                + "\n\n## Retry Trace Summary\n"
+                + "\n".join(trace_lines)
+                + "\n\n## Final Result (user-facing)\n"
+                + final_content.strip()
+            )
+
+            response = await provider.chat(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Call the save_task_learning tool with the structured result.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                tools=_SAVE_TASK_LEARNING_TOOL,
+                model=model,
+            )
+
+            if not response.has_tool_calls:
+                logger.warning("Task learning: LLM did not call save_task_learning")
+                return False
+
+            args = response.tool_calls[0].arguments
+            if isinstance(args, str):
+                args = json.loads(args)
+            if not isinstance(args, dict):
+                logger.warning("Task learning: unexpected arguments type {}", type(args).__name__)
+                return False
+
+            entry = args.get("history_entry")
+            if isinstance(entry, str) and entry.strip():
+                self.append_history(entry)
+
+            update = args.get("memory_update")
+            if isinstance(update, str) and update != current_memory:
+                self.write_long_term(update)
+
+            should_write_skill = args.get("should_write_skill") is True
+            skill_name = args.get("skill_name")
+            skill_markdown = args.get("skill_markdown")
+
+            if should_write_skill and isinstance(skill_name, str) and isinstance(skill_markdown, str):
+                safe_name = skill_name.strip().strip("/\\").replace("..", "").strip()
+                if safe_name:
+                    skills_dir = ensure_dir(self.memory_dir.parent / "skills" / safe_name)
+                    skill_file = skills_dir / "SKILL.md"
+                    skill_file.write_text(skill_markdown, encoding="utf-8")
+
+            return True
+        except Exception:
+            logger.exception("Task learning recording failed")
             return False
