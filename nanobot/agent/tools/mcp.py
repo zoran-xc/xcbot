@@ -1,7 +1,10 @@
 """MCP client: connects to MCP servers and wraps their tools as native nanobot tools."""
 
 import asyncio
+import base64
+import re
 from contextlib import AsyncExitStack
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -9,18 +12,32 @@ from loguru import logger
 
 from nanobot.agent.tools.base import Tool
 from nanobot.agent.tools.registry import ToolRegistry
+from nanobot.utils.helpers import ensure_dir, timestamp
 
 
 class MCPToolWrapper(Tool):
     """Wraps a single MCP server tool as a nanobot Tool."""
 
-    def __init__(self, session, server_name: str, tool_def, tool_timeout: int = 30):
+    _IMAGE_RE = re.compile(
+        r"type=['\"]image['\"]\s+data=['\"](?P<data>[A-Za-z0-9+/=\r\n]+)['\"]",
+        re.IGNORECASE,
+    )
+
+    def __init__(
+        self,
+        session,
+        server_name: str,
+        tool_def,
+        workspace: Path,
+        tool_timeout: int = 30,
+    ):
         self._session = session
         self._original_name = tool_def.name
         self._name = f"mcp_{server_name}_{tool_def.name}"
         self._description = tool_def.description or tool_def.name
         self._parameters = tool_def.inputSchema or {"type": "object", "properties": {}}
         self._tool_timeout = tool_timeout
+        self._workspace = workspace
 
     @property
     def name(self) -> str:
@@ -44,17 +61,51 @@ class MCPToolWrapper(Tool):
         except asyncio.TimeoutError:
             logger.warning("MCP tool '{}' timed out after {}s", self._name, self._tool_timeout)
             return f"(MCP tool call timed out after {self._tool_timeout}s)"
-        parts = []
+        parts: list[str] = []
         for block in result.content:
             if isinstance(block, types.TextContent):
-                parts.append(block.text)
+                parts.append(self._decode_inline_images(block.text))
             else:
                 parts.append(str(block))
         return "\n".join(parts) or "(no output)"
 
+    def _decode_inline_images(self, text: str) -> str:
+        """Decode inline MCP image payloads in text and save to workspace.
+
+        Some MCP servers return images embedded in text blocks, e.g.
+        type='image' data='<base64...>'
+        """
+
+        def _write(match: re.Match) -> str:
+            b64 = (match.group("data") or "").strip().replace("\n", "").replace("\r", "")
+            if not b64:
+                return match.group(0)
+            try:
+                raw = base64.b64decode(b64, validate=False)
+            except Exception as e:
+                logger.warning("MCP tool '{}': failed to decode image base64: {}", self._name, e)
+                return match.group(0)
+
+            media_dir = ensure_dir(self._workspace / "mcp_media")
+            fname = f"{self._name}_{timestamp().replace(':', '').replace('/', '')}.png"
+            path = media_dir / fname
+            try:
+                path.write_bytes(raw)
+            except Exception as e:
+                logger.warning("MCP tool '{}': failed to write image file {}: {}", self._name, path, e)
+                return match.group(0)
+
+            # Keep output LLM-friendly: show a concrete path it can attach via `message`.
+            return f"[image saved: {path}]"
+
+        return self._IMAGE_RE.sub(_write, text)
+
 
 async def connect_mcp_servers(
-    mcp_servers: dict, registry: ToolRegistry, stack: AsyncExitStack
+    mcp_servers: dict,
+    registry: ToolRegistry,
+    stack: AsyncExitStack,
+    workspace: Path,
 ) -> None:
     """Connect to configured MCP servers and register their tools."""
     from mcp import ClientSession, StdioServerParameters
@@ -90,7 +141,13 @@ async def connect_mcp_servers(
 
             tools = await session.list_tools()
             for tool_def in tools.tools:
-                wrapper = MCPToolWrapper(session, name, tool_def, tool_timeout=cfg.tool_timeout)
+                wrapper = MCPToolWrapper(
+                    session,
+                    name,
+                    tool_def,
+                    workspace=workspace,
+                    tool_timeout=cfg.tool_timeout,
+                )
                 registry.register(wrapper)
                 logger.debug("MCP: registered tool '{}' from server '{}'", wrapper.name, name)
 
