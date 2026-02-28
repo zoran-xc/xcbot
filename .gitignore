@@ -21,3 +21,5 @@ poetry.lock
 botpy.log
 tests/
 .DS_Store
+.idea/
+deploy/nanobot/
