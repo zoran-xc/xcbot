@@ -284,6 +284,12 @@ def gateway(
         max_tokens=config.agents.defaults.max_tokens,
         max_iterations=config.agents.defaults.max_tool_iterations,
         memory_window=config.agents.defaults.memory_window,
+        context_compaction_trigger_tokens=getattr(
+            config.agents.defaults, "context_compaction_trigger_tokens", None
+        ),
+        context_compaction_max_rounds=getattr(
+            config.agents.defaults, "context_compaction_max_rounds", None
+        ),
         brave_api_key=config.tools.web.search.api_key or None,
         exec_config=config.tools.exec,
         cron_service=cron,
@@ -453,6 +459,12 @@ def agent(
         max_tokens=config.agents.defaults.max_tokens,
         max_iterations=config.agents.defaults.max_tool_iterations,
         memory_window=config.agents.defaults.memory_window,
+        context_compaction_trigger_tokens=getattr(
+            config.agents.defaults, "context_compaction_trigger_tokens", None
+        ),
+        context_compaction_max_rounds=getattr(
+            config.agents.defaults, "context_compaction_max_rounds", None
+        ),
         brave_api_key=config.tools.web.search.api_key or None,
         exec_config=config.tools.exec,
         cron_service=cron,

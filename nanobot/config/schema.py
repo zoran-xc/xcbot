@@ -227,6 +227,8 @@ class AgentDefaults(Base):
     temperature: float = 0.1
     max_tool_iterations: int = 40
     memory_window: int = 100
+    context_compaction_trigger_tokens: int = 38_000
+    context_compaction_max_rounds: int = 3
 
 
 class AgentsConfig(Base):

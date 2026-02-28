@@ -48,6 +48,8 @@ class AgentLoop:
     """
 
     _TOOL_RESULT_MAX_CHARS = 500
+    _DEFAULT_CONTEXT_COMPACTION_TRIGGER_TOKENS = 38_000
+    _DEFAULT_CONTEXT_COMPACTION_MAX_ROUNDS = 3
 
     @dataclass
     class _AttemptOutcome:
@@ -67,6 +69,8 @@ class AgentLoop:
         temperature: float = 0.1,
         max_tokens: int = 4096,
         memory_window: int = 100,
+        context_compaction_trigger_tokens: int | None = None,
+        context_compaction_max_rounds: int | None = None,
         brave_api_key: str | None = None,
         exec_config: ExecToolConfig | None = None,
         cron_service: CronService | None = None,
@@ -86,6 +90,16 @@ class AgentLoop:
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.memory_window = memory_window
+        self.context_compaction_trigger_tokens = (
+            int(context_compaction_trigger_tokens)
+            if context_compaction_trigger_tokens is not None
+            else self._DEFAULT_CONTEXT_COMPACTION_TRIGGER_TOKENS
+        )
+        self.context_compaction_max_rounds = (
+            int(context_compaction_max_rounds)
+            if context_compaction_max_rounds is not None
+            else self._DEFAULT_CONTEXT_COMPACTION_MAX_ROUNDS
+        )
         self.brave_api_key = brave_api_key
         self.exec_config = exec_config or ExecToolConfig()
         self.cron_service = cron_service
@@ -199,6 +213,67 @@ class AgentLoop:
                     if isinstance(item, dict) and item.get("type") == "image_url":
                         return True
         return False
+
+    @staticmethod
+    def _estimate_prompt_tokens(messages: list[dict[str, Any]]) -> int:
+        total_chars = 0
+        for m in messages:
+            content = m.get("content")
+            if isinstance(content, str):
+                total_chars += len(content)
+            elif isinstance(content, list):
+                for item in content:
+                    if not isinstance(item, dict):
+                        continue
+                    if item.get("type") == "text":
+                        t = item.get("text")
+                        if isinstance(t, str):
+                            total_chars += len(t)
+                    elif item.get("type") == "image_url":
+                        total_chars += 200
+            else:
+                total_chars += len(str(content))
+            total_chars += 40
+        return max(1, total_chars // 4)
+
+    async def _compact_context_if_needed(
+        self,
+        *,
+        session: Session,
+        session_key: str,
+        channel: str,
+        chat_id: str,
+        current_message: str,
+        media: list[str] | None,
+        extra_system_prompt: str | None,
+    ) -> list[dict[str, Any]]:
+        """Ensure the built prompt stays under the soft token limit by consolidating history."""
+
+        for _round in range(max(0, self.context_compaction_max_rounds)):
+            history = session.get_history(max_messages=self.memory_window)
+            msgs = self.context.build_messages(
+                history=history,
+                current_message=current_message,
+                media=media,
+                channel=channel,
+                chat_id=chat_id,
+                extra_system_prompt=extra_system_prompt,
+            )
+            est = self._estimate_prompt_tokens(msgs)
+            if est <= self.context_compaction_trigger_tokens:
+                return history
+
+            lock = self._consolidation_locks.setdefault(session.key, asyncio.Lock())
+            async with lock:
+                before = session.last_consolidated
+                ok = await self._consolidate_memory(session)
+                after = session.last_consolidated
+            if not ok:
+                return history
+            if after == before:
+                return history
+
+        return session.get_history(max_messages=self.memory_window)
 
     @staticmethod
     def _has_tool_errors(messages: list[dict]) -> bool:
@@ -361,7 +436,7 @@ class AgentLoop:
     async def _run_with_retries(
         self,
         *,
-        build_messages: Callable[[str | None], list[dict]],
+        build_messages: Callable[[str | None], Awaitable[list[dict]]],
         on_progress: Callable[..., Awaitable[None]] | None,
     ) -> tuple[str | None, list[str], list[dict], list[AttemptTrace]]:
         """Run attempts with policy:
@@ -402,7 +477,7 @@ class AgentLoop:
                 await _notify("【系统】检测到任务执行异常，将进行自动重试（系统重试 1/1）。")
 
             started_at = asyncio.get_event_loop().time()
-            msgs = build_messages(None)
+            msgs = await build_messages(None)
             last_messages = msgs
             outcome = await self._run_single_attempt(msgs, on_progress=on_progress)
             last_outcome = outcome
@@ -434,7 +509,7 @@ class AgentLoop:
                 "【系统】自动重试未成功，我将整理失败信息并再次尝试（反思重试 {}/2）。".format(j + 1)
             )
             started_at = asyncio.get_event_loop().time()
-            msgs = build_messages(extra_prompt)
+            msgs = await build_messages(extra_prompt)
             last_messages = msgs
             outcome = await self._run_single_attempt(msgs, on_progress=on_progress)
             last_outcome = outcome
@@ -564,8 +639,16 @@ class AgentLoop:
             key = f"{channel}:{chat_id}"
             session = self.sessions.get_or_create(key)
             self._set_tool_context(channel, chat_id, msg.metadata.get("message_id"))
-            history = session.get_history(max_messages=self.memory_window)
-            def _build(extra_system_prompt: str | None) -> list[dict]:
+            history = await self._compact_context_if_needed(
+                session=session,
+                session_key=key,
+                channel=channel,
+                chat_id=chat_id,
+                current_message=msg.content,
+                media=None,
+                extra_system_prompt=None,
+            )
+            async def _build(extra_system_prompt: str | None) -> list[dict]:
                 return self.context.build_messages(
                     history=history,
                     current_message=msg.content,
@@ -579,7 +662,8 @@ class AgentLoop:
                 on_progress=on_progress,
             )
             self._try_append_task_anchor(key, final_content)
-            self._save_turn(session, all_msgs, 1 + len(history))
+            history_for_skip = session.get_history(max_messages=self.memory_window)
+            self._save_turn(session, all_msgs, 1 + len(history_for_skip))
             if traces and any(not t.ok for t in traces) and final_content and "人工干预" not in final_content:
                 await MemoryStore(self.workspace).record_task_lesson(
                     session=session,
@@ -659,8 +743,16 @@ class AgentLoop:
             if isinstance(message_tool, MessageTool):
                 message_tool.start_turn()
 
-        history = session.get_history(max_messages=self.memory_window)
-        def _build(extra_system_prompt: str | None) -> list[dict]:
+        async def _build(extra_system_prompt: str | None) -> list[dict]:
+            history = await self._compact_context_if_needed(
+                session=session,
+                session_key=key,
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                current_message=msg.content,
+                media=msg.media if msg.media else None,
+                extra_system_prompt=extra_system_prompt,
+            )
             return self.context.build_messages(
                 history=history,
                 current_message=msg.content,
@@ -688,7 +780,8 @@ class AgentLoop:
         if final_content is None:
             final_content = "I've completed processing but have no response to give."
 
-        self._save_turn(session, all_msgs, 1 + len(history))
+        history_for_skip = session.get_history(max_messages=self.memory_window)
+        self._save_turn(session, all_msgs, 1 + len(history_for_skip))
         if traces and any(not t.ok for t in traces) and final_content and "人工干预" not in final_content:
             await MemoryStore(self.workspace).record_task_lesson(
                 session=session,

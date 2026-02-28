@@ -4,7 +4,6 @@ import asyncio
 import json
 import os
 import re
-import threading
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any
@@ -15,6 +14,7 @@ from nanobot.bus.events import OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.channels.base import BaseChannel
 from nanobot.config.schema import FeishuConfig
+from nanobot.utils.media_cache import MediaCache
 
 try:
     import lark_oapi as lark
@@ -559,8 +559,14 @@ class FeishuChannel(BaseChannel):
             (file_path, content_text) - file_path is None if download failed
         """
         loop = asyncio.get_running_loop()
-        media_dir = Path.home() / ".nanobot" / "media"
-        media_dir.mkdir(parents=True, exist_ok=True)
+        # KISS: persist inbound media into the nanobot workspace cache so that:
+        # - InboundMessage.media can reference local files
+        # - the `media` tool can query them via cache/media/index.jsonl
+        #
+        # Note: ChannelManager does not currently pass workspace into channels, so we
+        # infer the default workspace (~/.nanobot/workspace), which matches current deploy.
+        workspace = Path.home() / ".nanobot" / "workspace"
+        cache = MediaCache(workspace)
 
         data, filename = None, None
 
@@ -584,10 +590,22 @@ class FeishuChannel(BaseChannel):
                     filename = f"{file_key[:16]}{ext}"
 
         if data and filename:
-            file_path = media_dir / filename
-            file_path.write_bytes(data)
-            logger.debug("Downloaded {} to {}", msg_type, file_path)
-            return str(file_path), f"[{msg_type}: {filename}]"
+            ext = os.path.splitext(filename)[1] or (".jpg" if msg_type == "image" else "")
+            source_key = (
+                content_json.get("image_key")
+                if msg_type == "image"
+                else content_json.get("file_key")
+            )
+            prefix = "feishu_image" if msg_type == "image" else f"feishu_{msg_type}"
+            path = cache.save_bytes(
+                data,
+                ext=ext,
+                prefix=prefix,
+                mime=None,
+                source=f"feishu:{message_id}:{source_key}",
+            )
+            logger.debug("Downloaded {} to {}", msg_type, path)
+            return str(path), f"[{msg_type}: {path.name}]"
 
         return None, f"[{msg_type}: download failed]"
 
