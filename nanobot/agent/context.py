@@ -144,7 +144,7 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
         
         if not images:
             return text
-        return images + [{"type": "text", "text": text}]
+        return [{"type": "text", "text": text}] + images
     
     def add_tool_result(
         self, messages: list[dict[str, Any]],

@@ -221,6 +221,14 @@ def _make_provider(config: Config):
             default_model=model,
         )
 
+    # SiliconFlow: OpenAI-compatible, but vision/multimodal is more reliable via direct client.
+    if provider_name == "siliconflow":
+        return CustomProvider(
+            api_key=p.api_key if p else "no-key",
+            api_base=config.get_api_base(model) or "https://api.siliconflow.cn/v1",
+            default_model=model,
+        )
+
     from nanobot.providers.registry import find_by_name
     spec = find_by_name(provider_name)
     if not model.startswith("bedrock/") and not (p and p.api_key) and not (spec and spec.is_oauth):

@@ -366,6 +366,28 @@ class AgentLoop:
                         error_message="vision model not configured",
                     )
                 model = vision_model
+                try:
+                    block_types: list[str] = []
+                    for m in messages:
+                        if m.get("role") != "user":
+                            continue
+                        c = m.get("content")
+                        if isinstance(c, list):
+                            block_types.extend(
+                                [str(item.get("type")) for item in c if isinstance(item, dict) and item.get("type")]
+                            )
+                    if block_types:
+                        logger.info(
+                            "Vision input detected; using vision model: {} (user block types: {})",
+                            model,
+                            ",".join(block_types),
+                        )
+                    else:
+                        logger.info("Vision input detected; using vision model: {}", model)
+                except Exception:
+                    logger.info("Vision input detected; using vision model: {}", model)
+            else:
+                logger.debug("No vision input; using model: {}", model)
 
             try:
                 response = await self.provider.chat(
@@ -376,11 +398,24 @@ class AgentLoop:
                     max_tokens=self.max_tokens,
                 )
             except Exception as e:
+                logger.error("LLM call raised exception (model={}): {}", model, e)
                 return self._AttemptOutcome(
-                    final_content=None,
+                    final_content=f"Error calling LLM: {str(e)}",
                     tools_used=tools_used,
                     messages=messages,
-                    error_message=str(e),
+                    error_message=f"LLM exception (model={model}): {str(e)}",
+                )
+
+            if (
+                getattr(response, "finish_reason", None) == "error"
+                or (isinstance(response.content, str) and response.content.startswith("Error calling LLM:"))
+            ):
+                logger.error("LLM call failed (model={}): {}", model, response.content)
+                return self._AttemptOutcome(
+                    final_content=response.content or "Error calling LLM",
+                    tools_used=tools_used,
+                    messages=messages,
+                    error_message=f"LLM error (model={model}): {response.content}",
                 )
 
             if response.has_tool_calls:
@@ -415,6 +450,7 @@ class AgentLoop:
                     # ToolRegistry.execute already catches exceptions and returns an error string.
                     result = await self.tools.execute(tool_call.name, tool_call.arguments)
                     messages = self.context.add_tool_result(messages, tool_call.id, tool_call.name, result)
+
             else:
                 clean = self._strip_think(response.content)
                 messages = self.context.add_assistant_message(

@@ -589,18 +589,23 @@ class FeishuChannel(BaseChannel):
 
         if data and filename:
             ext = os.path.splitext(filename)[1] or (".jpg" if msg_type == "image" else "")
+            stem = os.path.splitext(os.path.basename(filename))[0]
+            safe_stem = re.sub(r"[^a-zA-Z0-9_\-]+", "_", stem).strip("_")
+            if safe_stem:
+                safe_stem = safe_stem[:24]
             source_key = (
                 content_json.get("image_key")
                 if msg_type == "image"
                 else content_json.get("file_key")
             )
-            prefix = "feishu_image" if msg_type == "image" else f"feishu_{msg_type}"
+            base_prefix = "feishu_image" if msg_type == "image" else f"feishu_{msg_type}"
+            prefix = f"{base_prefix}_{safe_stem}" if safe_stem else base_prefix
             path = cache.save_bytes(
                 data,
                 ext=ext,
                 prefix=prefix,
                 mime=None,
-                source=f"feishu:{message_id}:{source_key}",
+                source=f"feishu:{message_id}:{source_key}:{filename}",
             )
             logger.debug("Downloaded {} to {}", msg_type, path)
             return str(path), f"[{msg_type}: {path.name}]"
@@ -668,9 +673,15 @@ class FeishuChannel(BaseChannel):
                     elements = self._build_card_elements(msg.content)
                     card = {
                         "config": {"wide_screen_mode": True},
+                        "header": {
+                            "title": {
+                                "tag": "plain_text",
+                                "content": "nanobot",
+                            }
+                        },
                         "elements": elements,
                     }
-                    await loop.run_in_executor(
+                    ok = await loop.run_in_executor(
                         None,
                         self._send_message_sync,
                         receive_id_type,
@@ -678,6 +689,15 @@ class FeishuChannel(BaseChannel):
                         "interactive",
                         json.dumps({"card": card}, ensure_ascii=False),
                     )
+                    if not ok:
+                        await loop.run_in_executor(
+                            None,
+                            self._send_message_sync,
+                            receive_id_type,
+                            msg.chat_id,
+                            "text",
+                            json.dumps({"text": msg.content}, ensure_ascii=False),
+                        )
                 else:
                     await loop.run_in_executor(
                         None,
