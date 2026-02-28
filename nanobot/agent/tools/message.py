@@ -1,5 +1,6 @@
 """Message tool for sending messages to users."""
 
+import re
 from typing import Any, Awaitable, Callable
 
 from nanobot.agent.tools.base import Tool
@@ -88,6 +89,14 @@ class MessageTool(Tool):
 
         if not self._send_callback:
             return "Error: Message sending not configured"
+
+        _data_uri_img = re.search(r"data:image/[a-z0-9.+-]+;base64,", content or "", flags=re.IGNORECASE)
+        _type_image = re.search(r"type=['\"]image['\"]\s+data=['\"]", content or "", flags=re.IGNORECASE)
+        if _data_uri_img or _type_image:
+            return (
+                "Error: Refusing to send inline base64 image data. "
+                "Save the image to a file in the workspace cache and send it via the 'media' field (file path)."
+            )
 
         msg = OutboundMessage(
             channel=channel,

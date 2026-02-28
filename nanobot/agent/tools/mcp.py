@@ -1,7 +1,6 @@
 """MCP client: connects to MCP servers and wraps their tools as native nanobot tools."""
 
 import asyncio
-import base64
 import re
 from contextlib import AsyncExitStack
 from pathlib import Path
@@ -12,7 +11,8 @@ from loguru import logger
 
 from nanobot.agent.tools.base import Tool
 from nanobot.agent.tools.registry import ToolRegistry
-from nanobot.utils.helpers import ensure_dir, timestamp
+from nanobot.utils.helpers import timestamp
+from nanobot.utils.media_cache import MediaCache
 
 
 class MCPToolWrapper(Tool):
@@ -20,6 +20,11 @@ class MCPToolWrapper(Tool):
 
     _IMAGE_RE = re.compile(
         r"type=['\"]image['\"]\s+data=['\"](?P<data>[A-Za-z0-9+/=\r\n]+)['\"]",
+        re.IGNORECASE,
+    )
+
+    _MD_DATA_URI_IMAGE_RE = re.compile(
+        r"!\[(?P<alt>[^\]]*)\]\(data:(?P<mime>image/[A-Za-z0-9.+-]+);base64,(?P<data>[A-Za-z0-9+/=\r\n]+)\)",
         re.IGNORECASE,
     )
 
@@ -38,6 +43,7 @@ class MCPToolWrapper(Tool):
         self._parameters = tool_def.inputSchema or {"type": "object", "properties": {}}
         self._tool_timeout = tool_timeout
         self._workspace = workspace
+        self._media = MediaCache(workspace)
 
     @property
     def name(self) -> str:
@@ -59,15 +65,80 @@ class MCPToolWrapper(Tool):
                 timeout=self._tool_timeout,
             )
         except asyncio.TimeoutError:
-            logger.warning("MCP tool '{}' timed out after {}s", self._name, self._tool_timeout)
+            logger.warning("MCP tool '{}': timed out after {}s", self._name, self._tool_timeout)
             return f"(MCP tool call timed out after {self._tool_timeout}s)"
         parts: list[str] = []
         for block in result.content:
             if isinstance(block, types.TextContent):
                 parts.append(self._decode_inline_images(block.text))
+            elif getattr(types, "ImageContent", None) is not None and isinstance(block, types.ImageContent):
+                parts.append(self._save_image_block(block))
             else:
-                parts.append(str(block))
+                # Best-effort: some servers may return image-like blocks without using ImageContent.
+                saved = self._save_unknown_image_like_block(block)
+                parts.append(saved if saved is not None else str(block))
         return "\n".join(parts) or "(no output)"
+
+    def _save_image_block(self, block: Any) -> str:
+        """Save a structured MCP ImageContent block to a file and return a placeholder."""
+        mime = getattr(block, "mime_type", None) or getattr(block, "mimeType", None) or "image/png"
+        data = getattr(block, "data", None)
+
+        ext = {
+            "image/png": "png",
+            "image/jpeg": "jpg",
+            "image/jpg": "jpg",
+            "image/webp": "webp",
+            "image/gif": "gif",
+        }.get(str(mime).lower(), "png")
+
+        if isinstance(data, (bytes, bytearray)):
+            try:
+                path = self._media.save_bytes(data, ext=ext, prefix=self._name)
+                return f"[image saved: {path}]"
+            except Exception as e:
+                logger.warning("MCP tool '{}': failed to write ImageContent file: {}", self._name, e)
+                return "[image: write failed]"
+
+        if isinstance(data, str):
+            b64 = data.strip().replace("\n", "").replace("\r", "")
+            try:
+                path = self._media.save_base64(b64, ext=ext, prefix=self._name)
+                return f"[image saved: {path}]"
+            except Exception as e:
+                logger.warning("MCP tool '{}': failed to decode/write ImageContent base64: {}", self._name, e)
+                return "[image: decode failed]"
+
+        return "[image: decode failed]"
+
+    def _save_unknown_image_like_block(self, block: Any) -> str | None:
+        """Try to save image data from non-standard blocks.
+
+        This is defensive: if an MCP implementation returns dict-like blocks containing
+        {mime_type/mimeType, data}, we still want to save them rather than stringify.
+        """
+        try:
+            mime = None
+            data = None
+            if isinstance(block, dict):
+                mime = block.get("mime_type") or block.get("mimeType") or block.get("mime")
+                data = block.get("data")
+            else:
+                mime = getattr(block, "mime_type", None) or getattr(block, "mimeType", None)
+                data = getattr(block, "data", None)
+
+            if not mime or data is None:
+                return None
+
+            class _Tmp:
+                pass
+
+            tmp = _Tmp()
+            setattr(tmp, "mime_type", mime)
+            setattr(tmp, "data", data)
+            return self._save_image_block(tmp)
+        except Exception:
+            return None
 
     def _decode_inline_images(self, text: str) -> str:
         """Decode inline MCP image payloads in text and save to workspace.
@@ -76,29 +147,36 @@ class MCPToolWrapper(Tool):
         type='image' data='<base64...>'
         """
 
-        def _write(match: re.Match) -> str:
-            b64 = (match.group("data") or "").strip().replace("\n", "").replace("\r", "")
+        def _write_b64(b64: str, ext: str) -> str:
+            b64 = (b64 or "").strip().replace("\n", "").replace("\r", "")
             if not b64:
-                return match.group(0)
+                return ""
             try:
-                raw = base64.b64decode(b64, validate=False)
+                path = self._media.save_base64(b64, ext=ext, prefix=self._name)
+                return f"[image saved: {path}]"
             except Exception as e:
-                logger.warning("MCP tool '{}': failed to decode image base64: {}", self._name, e)
-                return match.group(0)
+                logger.warning("MCP tool '{}': failed to decode/write inline image base64: {}", self._name, e)
+                return ""
 
-            media_dir = ensure_dir(self._workspace / "mcp_media")
-            fname = f"{self._name}_{timestamp().replace(':', '').replace('/', '')}.png"
-            path = media_dir / fname
-            try:
-                path.write_bytes(raw)
-            except Exception as e:
-                logger.warning("MCP tool '{}': failed to write image file {}: {}", self._name, path, e)
-                return match.group(0)
+        def _write_type_image(match: re.Match) -> str:
+            repl = _write_b64(match.group("data") or "", "png")
+            return repl or match.group(0)
 
-            # Keep output LLM-friendly: show a concrete path it can attach via `message`.
-            return f"[image saved: {path}]"
+        def _write_md_data_uri(match: re.Match) -> str:
+            mime = (match.group("mime") or "").lower()
+            ext = {
+                "image/png": "png",
+                "image/jpeg": "jpg",
+                "image/jpg": "jpg",
+                "image/webp": "webp",
+                "image/gif": "gif",
+            }.get(mime, "png")
+            repl = _write_b64(match.group("data") or "", ext)
+            return repl or match.group(0)
 
-        return self._IMAGE_RE.sub(_write, text)
+        text = self._IMAGE_RE.sub(_write_type_image, text)
+        text = self._MD_DATA_URI_IMAGE_RE.sub(_write_md_data_uri, text)
+        return text
 
 
 async def connect_mcp_servers(
