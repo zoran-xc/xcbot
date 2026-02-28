@@ -25,9 +25,12 @@ COPY nanobot/ nanobot/
 COPY bridge/ bridge/
 RUN uv pip install --system --no-cache .
 
-# Build the WhatsApp bridge
+# Build the WhatsApp bridge - cache npm install layer
 WORKDIR /app/bridge
-RUN npm install && npm run build
+COPY bridge/package.json ./
+RUN npm install
+COPY bridge/ ./
+RUN npm run build
 WORKDIR /app
 
 # Create config directory

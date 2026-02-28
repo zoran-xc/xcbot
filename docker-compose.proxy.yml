@@ -8,7 +8,7 @@ x-common-config: &common-config
 services:
   mihomo:
     container_name: nanobot-proxy
-    image: ghcr.io/metacubex/mihomo:latest
+    image: docker.io/metacubex/mihomo:Alpha
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
@@ -19,10 +19,7 @@ services:
       - net.ipv6.conf.all.disable_ipv6=1
     volumes:
       - ./deploy/proxy/mihomo:/etc/mihomo
-    ports:
-      - 18790:18790
-      - 7890:7890
-      - 9090:9090
+    # 端口不映射到宿主机，只给内部服务通过 network_mode 使用
 
   nanobot-gateway:
     container_name: nanobot-gateway
