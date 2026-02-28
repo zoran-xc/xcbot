@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import json_repair
+from loguru import logger
 from openai import AsyncOpenAI
 
 from nanobot.providers.base import LLMProvider, LLMResponse, ToolCallRequest
@@ -28,8 +29,19 @@ class CustomProvider(LLMProvider):
         if tools:
             kwargs.update(tools=tools, tool_choice="auto")
         try:
-            return self._parse(await self._client.chat.completions.create(**kwargs))
+            logger.info(
+                "SiliconFlow request (CustomProvider): base_url={}, path=/chat/completions, headers={{Authorization: Bearer ****, Content-Type: application/json}}, body={} ",
+                self.api_base,
+                kwargs,
+            )
+            raw = await self._client.chat.completions.create(**kwargs)
+            try:
+                logger.info("SiliconFlow response (CustomProvider): {}", raw.model_dump())
+            except Exception:
+                logger.info("SiliconFlow response (CustomProvider): {}", raw)
+            return self._parse(raw)
         except Exception as e:
+            logger.error("SiliconFlow error (CustomProvider): {}", e)
             return LLMResponse(content=f"Error: {e}", finish_reason="error")
 
     def _parse(self, response: Any) -> LLMResponse:
@@ -41,10 +53,14 @@ class CustomProvider(LLMProvider):
             for tc in (msg.tool_calls or [])
         ]
         u = response.usage
+        content = msg.content
+        reasoning_content = getattr(msg, "reasoning_content", None) or None
+        if (content is None or (isinstance(content, str) and not content.strip())) and reasoning_content:
+            content = reasoning_content
         return LLMResponse(
-            content=msg.content, tool_calls=tool_calls, finish_reason=choice.finish_reason or "stop",
+            content=content, tool_calls=tool_calls, finish_reason=choice.finish_reason or "stop",
             usage={"prompt_tokens": u.prompt_tokens, "completion_tokens": u.completion_tokens, "total_tokens": u.total_tokens} if u else {},
-            reasoning_content=getattr(msg, "reasoning_content", None) or None,
+            reasoning_content=reasoning_content,
         )
 
     def get_default_model(self) -> str:

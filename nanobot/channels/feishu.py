@@ -264,10 +264,12 @@ class FeishuChannel(BaseChannel):
         super().__init__(config, bus, workspace)
         self.config: FeishuConfig = config
         self._client: Any = None
-        self._ws_client: Any = None
-        self._ws_thread: threading.Thread | None = None
-        self._processed_message_ids: OrderedDict[str, None] = OrderedDict()  # Ordered dedup cache
+        self._card_disabled: bool = False
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._ws_thread: threading.Thread | None = None
+        self._ws_client: Any = None
+        self._processed_message_ids: OrderedDict[str, None] = OrderedDict()  # Ordered dedup cache
+        
     
     async def start(self) -> None:
         """Start the Feishu bot with WebSocket long connection."""
@@ -396,18 +398,16 @@ class FeishuChannel(BaseChannel):
         }
 
     def _build_card_elements(self, content: str) -> list[dict]:
-        """Split content into div/markdown + table elements for Feishu card."""
-        elements, last_end = [], 0
-        for m in self._TABLE_RE.finditer(content):
-            before = content[last_end:m.start()]
-            if before.strip():
-                elements.extend(self._split_headings(before))
-            elements.append(self._parse_md_table(m.group(1)) or {"tag": "markdown", "content": m.group(1)})
-            last_end = m.end()
-        remaining = content[last_end:]
-        if remaining.strip():
-            elements.extend(self._split_headings(remaining))
-        return elements or [{"tag": "markdown", "content": content}]
+        """Build minimal Feishu card elements."""
+        return [
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": content,
+                },
+            }
+        ]
 
     def _split_headings(self, content: str) -> list[dict]:
         """Split content by headings, converting headings to div elements."""
@@ -615,6 +615,13 @@ class FeishuChannel(BaseChannel):
     def _send_message_sync(self, receive_id_type: str, receive_id: str, msg_type: str, content: str) -> bool:
         """Send a single message (text/image/file/interactive) synchronously."""
         try:
+            logger.info(
+                "Feishu request: receive_id_type={}, receive_id={}, msg_type={}, content={}",
+                receive_id_type,
+                receive_id,
+                msg_type,
+                content,
+            )
             request = CreateMessageRequest.builder() \
                 .receive_id_type(receive_id_type) \
                 .request_body(
@@ -625,6 +632,20 @@ class FeishuChannel(BaseChannel):
                     .build()
                 ).build()
             response = self._client.im.v1.message.create(request)
+            try:
+                raw = getattr(response, "raw", None)
+                data = getattr(response, "data", None)
+                logger.info(
+                    "Feishu response: success={}, code={}, msg={}, log_id={}, raw={}, data={}",
+                    response.success() if hasattr(response, "success") else None,
+                    getattr(response, "code", None),
+                    getattr(response, "msg", None),
+                    response.get_log_id() if hasattr(response, "get_log_id") else None,
+                    raw,
+                    data,
+                )
+            except Exception as e:
+                logger.error("Error logging Feishu response: {}", e)
             if not response.success():
                 logger.error(
                     "Failed to send Feishu {} message: code={}, msg={}, log_id={}",
@@ -669,7 +690,7 @@ class FeishuChannel(BaseChannel):
                         )
 
             if msg.content and msg.content.strip():
-                if getattr(self.config, "use_card", False):
+                if getattr(self.config, "use_card", False) and not self._card_disabled:
                     elements = self._build_card_elements(msg.content)
                     card = {
                         "config": {"wide_screen_mode": True},
@@ -690,6 +711,7 @@ class FeishuChannel(BaseChannel):
                         json.dumps({"card": card}, ensure_ascii=False),
                     )
                     if not ok:
+                        self._card_disabled = True
                         await loop.run_in_executor(
                             None,
                             self._send_message_sync,
