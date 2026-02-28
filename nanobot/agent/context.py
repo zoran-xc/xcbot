@@ -78,6 +78,11 @@ Your workspace is at: {workspace_path}
 - If a tool call fails, analyze the error before retrying with a different approach.
 - Ask for clarification when the request is ambiguous.
 
+## Truthfulness & Verification
+- Do NOT fabricate or guess factual data (e.g., weather, prices, status, logs).
+- If you cannot verify via tools or provided evidence, explicitly say you cannot confirm.
+- When tools are unavailable or blocked, propose alternative verifiable approaches instead of inventing an answer.
+
 Reply directly with text for conversations. Only use the 'message' tool to send to a specific chat channel."""
 
     @staticmethod

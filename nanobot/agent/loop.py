@@ -200,6 +200,40 @@ class AgentLoop:
                         return True
         return False
 
+    @staticmethod
+    def _has_tool_errors(messages: list[dict]) -> bool:
+        for m in messages:
+            if m.get("role") != "tool":
+                continue
+            c = m.get("content")
+            if isinstance(c, str) and c.strip().startswith("Error"):
+                return True
+        return False
+
+    @staticmethod
+    def _looks_like_give_up(text: str | None) -> bool:
+        if not text:
+            return False
+        t = text.lower()
+        # Keep it conservative: only phrases that clearly indicate inability.
+        patterns = (
+            "无法",
+            "不能",
+            "不可用",
+            "失败",
+            "超时",
+            "需要配置",
+            "需要 api key",
+            "please set",
+            "not configured",
+            "i can't",
+            "i cannot",
+            "unable to",
+            "sorry",
+            "apolog",
+        )
+        return any(p in t for p in patterns)
+
     async def _run_agent_loop(
         self,
         initial_messages: list[dict],
@@ -301,6 +335,14 @@ class AgentLoop:
                     reasoning_content=response.reasoning_content,
                 )
                 final_content = clean
+                # If tools errored and the assistant is effectively giving up, treat as failure.
+                if self._has_tool_errors(messages) and self._looks_like_give_up(final_content):
+                    return self._AttemptOutcome(
+                        final_content=final_content,
+                        tools_used=tools_used,
+                        messages=messages,
+                        error_message="non-exception failure: assistant reported inability after tool errors",
+                    )
                 break
 
         if final_content is None and iteration >= self.max_iterations:
@@ -349,16 +391,15 @@ class AgentLoop:
                 tools_used=list(tools),
             )
 
-        # Phase 1: normal + system mechanical retries (no prompt mutation)
+        # Phase 1: normal + system mechanical retry (no prompt mutation)
         last_outcome: AgentLoop._AttemptOutcome | None = None
         last_messages: list[dict] | None = None
 
-        for i in range(1 + 2):
+        # Total mechanical attempts: 2 (initial + 1 retry)
+        for i in range(2):
             stage = "normal" if i == 0 else "system_retry"
             if i == 1:
-                await _notify("【系统】检测到任务执行异常，将进行自动重试（系统重试 1/2）。")
-            if i == 2:
-                await _notify("【系统】系统重试仍未成功，将继续自动重试（系统重试 2/2）。")
+                await _notify("【系统】检测到任务执行异常，将进行自动重试（系统重试 1/1）。")
 
             started_at = asyncio.get_event_loop().time()
             msgs = build_messages(None)
@@ -376,7 +417,17 @@ class AgentLoop:
         # Phase 2: AI retries with FailureBundle prompt injection
         assert last_outcome is not None
         bundle = build_failure_bundle(traces, last_outcome.messages)
-        extra_prompt = bundle.to_prompt_block()
+        extra_prompt = (
+            bundle.to_prompt_block()
+            + "\n\n---\n\n"
+            + "# Retry Guidance (change framework)\n"
+            + "You must NOT fabricate or guess facts. If tools cannot verify, say so explicitly.\n\n"
+            + "When retrying, do not repeat the same approach. Follow this method:\n"
+            + "1) Propose 3-5 distinct options/approaches based on currently available tools and constraints.\n"
+            + "2) Pick ONE option to execute now; if it fails, on the next retry choose a different option.\n"
+            + "3) Prefer approaches that can be verified via tool outputs; include a quick verification step.\n"
+            + "4) If the environment blocks an action (safety guard / missing key), switch tools instead of persisting.\n"
+        )
 
         for j in range(2):
             await _notify(
