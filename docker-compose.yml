@@ -12,6 +12,7 @@ services:
     command: ["gateway"]
     restart: unless-stopped
     network_mode: host
+    shm_size: "2gb"
     environment:
       - HTTP_PROXY=http://127.0.0.1:7890
       - HTTPS_PROXY=http://127.0.0.1:7890
