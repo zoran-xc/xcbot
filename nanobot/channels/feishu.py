@@ -242,10 +242,29 @@ def _extract_element_content(element: dict) -> list[str]:
     return parts
 
 
+def _get_mention_union_ids(message: Any) -> list[str]:
+    """Extract union_ids of mentioned users/bots from Feishu message (event.message.mentions[].id.union_id)."""
+    mentions = getattr(message, "mentions", None)
+    if not mentions:
+        return []
+    ids: list[str] = []
+    for m in mentions:
+        id_val = getattr(m, "id", None)
+        if id_val is None and isinstance(m, dict):
+            id_val = m.get("id")
+        if isinstance(id_val, str):
+            ids.append(id_val)
+        elif id_val is not None:
+            uid = getattr(id_val, "union_id", None)
+            if isinstance(uid, str):
+                ids.append(uid)
+            elif isinstance(id_val, dict):
+                ids.append(id_val.get("union_id") or "")
+    return [x for x in ids if x]
+
+
 def _get_mention_open_ids(message: Any) -> list[str]:
-    """Extract open_ids of mentioned users/bots from Feishu message (event.message).
-    Handles both SDK object (with .mentions) and dict-like structure.
-    """
+    """Extract open_ids of mentioned users/bots (for backward compat)."""
     mentions = getattr(message, "mentions", None)
     if not mentions:
         return []
@@ -265,8 +284,8 @@ def _get_mention_open_ids(message: Any) -> list[str]:
     return [x for x in ids if x]
 
 
-def _get_mention_keys_for_open_id(message: Any, open_id: str) -> list[str]:
-    """Get mention keys (e.g. @_user_1) in message content for the given open_id."""
+def _get_mention_keys_for_union_id(message: Any, union_id: str) -> list[str]:
+    """Get mention keys (e.g. @_user_1) for the given union_id."""
     mentions = getattr(message, "mentions", None)
     if not mentions:
         return []
@@ -275,11 +294,10 @@ def _get_mention_keys_for_open_id(message: Any, open_id: str) -> list[str]:
         id_val = getattr(m, "id", None)
         if id_val is None and isinstance(m, dict):
             id_val = m.get("id")
-        oid = id_val if isinstance(id_val, str) else (getattr(id_val, "open_id", None) if id_val else None)
-        if id_val is not None and not isinstance(id_val, str):
-            if isinstance(id_val, dict):
-                oid = id_val.get("open_id")
-        if oid == open_id:
+        uid = id_val if isinstance(id_val, str) else (getattr(id_val, "union_id", None) if id_val else None)
+        if id_val is not None and not isinstance(id_val, str) and isinstance(id_val, dict):
+            uid = id_val.get("union_id")
+        if uid == union_id:
             k = getattr(m, "key", None) or (m.get("key") if isinstance(m, dict) else None)
             if isinstance(k, str) and k:
                 keys.append(k)
@@ -863,7 +881,13 @@ class FeishuChannel(BaseChannel):
             return
 
         try:
-            receive_id_type = "chat_id" if msg.chat_id.startswith("oc_") else "open_id"
+            # Prefer union_id for user DMs (on_*), chat_id for groups (oc_*)
+            if msg.chat_id.startswith("on_"):
+                receive_id_type = "union_id"
+            elif msg.chat_id.startswith("oc_"):
+                receive_id_type = "chat_id"
+            else:
+                receive_id_type = "open_id"
             loop = asyncio.get_running_loop()
 
             for file_path in msg.media:
@@ -970,7 +994,9 @@ class FeishuChannel(BaseChannel):
             if sender.sender_type == "bot":
                 return
 
-            sender_id = sender.sender_id.open_id if sender.sender_id else "unknown"
+            # Prefer union_id for user identity (allow_from and session/routing)
+            sid = sender.sender_id
+            sender_id = (getattr(sid, "union_id", None) or getattr(sid, "open_id", None) if sid else None) or "unknown"
             chat_id = message.chat_id
             chat_type = message.chat_type
             msg_type = message.message_type
@@ -978,16 +1004,23 @@ class FeishuChannel(BaseChannel):
             # When require_mention_in_group: messages that don't @ the bot are saved but don't trigger reply
             save_only_no_reply = False
             if chat_type == "group" and getattr(self.config, "require_mention_in_group", False):
+                bot_union_id = (getattr(self.config, "bot_union_id", None) or "").strip()
                 bot_open_id = (getattr(self.config, "bot_open_id", None) or "").strip()
-                if not bot_open_id:
+                bot_id = bot_union_id or bot_open_id
+                if not bot_id:
                     logger.warning(
-                        "Feishu require_mention_in_group is True but bot_open_id is not set; "
-                        "set bot_open_id in config (e.g. from Feishu open platform / bot info) to enable @-reply in groups"
+                        "Feishu require_mention_in_group is True but bot_union_id (or bot_open_id) is not set; "
+                        "set bot_union_id in config from event.message.mentions[].id.union_id when the bot is @mentioned"
                     )
                     return
-                mentioned_open_ids = _get_mention_open_ids(message)
-                if bot_open_id not in mentioned_open_ids:
-                    save_only_no_reply = True  # save to session, do not trigger AI reply
+                if bot_union_id:
+                    mentioned_ids = _get_mention_union_ids(message)
+                    if bot_union_id not in mentioned_ids:
+                        save_only_no_reply = True
+                else:
+                    mentioned_ids = _get_mention_open_ids(message)
+                    if bot_open_id not in mentioned_ids:
+                        save_only_no_reply = True
 
             # Add reaction only when we will actually reply (skip for save-only to avoid noise)
             if not save_only_no_reply:
@@ -1075,7 +1108,7 @@ class FeishuChannel(BaseChannel):
                 if recent:
                     metadata["feishu_recent_context"] = recent
 
-            # Forward to message bus
+            # Forward to message bus (DM: use sender union_id so allow_from and send use union_id)
             reply_to = chat_id if chat_type == "group" else sender_id
             await self._handle_message(
                 sender_id=sender_id,

@@ -444,27 +444,24 @@ Uses **WebSocket** long connection — no public IP required.
 ```
 
 > `encryptKey` and `verificationToken` are optional for Long Connection mode.
-> `allowFrom`: Leave empty to allow all users, or add `["ou_xxx"]` to restrict access.
+> `allowFrom`: Leave empty to allow all users, or add union_ids (e.g. `["on_xxx"]`) to restrict access.
 
-**Bot ID (bot_open_id) — 机器人 open_id 怎么查？**
+**Bot ID (bot_union_id) — 机器人 union_id 怎么查？**
 
-When using `requireMentionInGroup: true`, you must set `botOpenId` so the bot knows when it is @mentioned. Ways to get the bot's open_id:
+When using `requireMentionInGroup: true`, set `botUnionId` so the bot knows when it is @mentioned. Get the bot's **union_id** from the event:
 
 1. **From event (recommended)**  
-   In a group where the bot is added, have someone @ the bot. In your app logs or event handler, the received event's `message.mentions[]` contains entries with `id` (or `id.open_id`). The one that corresponds to your bot is the bot's open_id. Copy it into config as `botOpenId`.
+   In a group where the bot is added, have someone @ the bot. In the logged **Feishu event full body**, `event.message.mentions[]` has one entry for the bot with `id.union_id` (e.g. `on_xxx`). Copy that into config as `botUnionId`.
 
 2. **Feishu API**  
-   Use the Feishu Open API to get bot info (e.g. “获取机器人信息” / get bot identity). The returned open_id is what you need.
-
-3. **Open Platform**  
-   In [Feishu Open Platform](https://open.feishu.cn/app) → your app → some apps show the bot’s identity (open_id) under “Credentials & Basic Info” or “Robot” section.
+   Use the Feishu Open API “获取机器人信息” / get bot identity; use the returned union_id.
 
 **Optional: group-only reply when @mentioned**
 
 ```json
 "feishu": {
   "requireMentionInGroup": true,
-  "botOpenId": "ou_xxxx"
+  "botUnionId": "on_xxxx"
 }
 ```
 

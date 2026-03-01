@@ -41,12 +41,14 @@ class FeishuConfig(Base):
     app_secret: str = ""  # App Secret from Feishu Open Platform
     encrypt_key: str = ""  # Encrypt Key for event subscription (optional)
     verification_token: str = ""  # Verification Token for event subscription (optional)
-    allow_from: list[str] = Field(default_factory=list)  # Allowed user open_ids
+    allow_from: list[str] = Field(default_factory=list)  # Allowed user union_ids (event.sender.sender_id.union_id)
     react_emoji: str = "THUMBSUP"  # Emoji type for message reactions (e.g. THUMBSUP, OK, DONE, SMILE)
     use_card: bool = False  # If true, send outbound text as interactive card (lark_md).
     # Group chat: only reply when the bot is @mentioned
     require_mention_in_group: bool = False
-    # Bot's open_id for mention check. Where to get it: (1) In a group chat, have someone @ the bot and check the event's message.mentions[].id for the bot; (2) Call Feishu API "get bot info" / 获取机器人信息 with the app; (3) Some apps show it in Open Platform under 凭证与基础信息 or 机器人.
+    # Bot's union_id for mention check (event.message.mentions[].id.union_id when the bot is @mentioned).
+    bot_union_id: str = ""
+    # Deprecated: use bot_union_id. Kept for backward compat.
     bot_open_id: str = ""
     # When > 0, fetch this many recent messages from Feishu for group chats and pass as context (requires "get group messages" permission).
     fetch_group_history_size: int = 0
