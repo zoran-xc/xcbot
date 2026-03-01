@@ -13,9 +13,7 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
-      - HTTP_PROXY=http://127.0.0.1:7890
-      - HTTPS_PROXY=http://127.0.0.1:7890
-      - NO_PROXY=localhost,127.0.0.1
+      - NO_PROXY=localhost,127.0.0.1,open.feishu.cn,*.feishu.cn,*.larkoffice.com
     deploy:
       resources:
         limits:

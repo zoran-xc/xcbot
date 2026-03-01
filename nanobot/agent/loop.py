@@ -433,6 +433,25 @@ class AgentLoop:
                     result = await self.tools.execute(tool_call.name, tool_call.arguments)
                     messages = self.context.add_tool_result(messages, tool_call.id, tool_call.name, result)
 
+                    # Emit tool result to channel when on_progress supports reply_kind (e.g. for execution visibility)
+                    if on_progress:
+                        result_str = result if isinstance(result, str) else str(result)
+                        display = (
+                            result_str
+                            if len(result_str) <= self._TOOL_RESULT_MAX_CHARS
+                            else result_str[: self._TOOL_RESULT_MAX_CHARS] + "\n... (truncated)"
+                        )
+                        try:
+                            await on_progress(
+                                f"【工具结果】{tool_call.name}: {display}",
+                                reply_kind="tool_result",
+                                tool_name=tool_call.name,
+                                tool_result=result_str,
+                            )
+                        except TypeError:
+                            # Progress callback may not accept kwargs (e.g. CLI); call with content only
+                            await on_progress(f"【工具结果】{tool_call.name}: {display}")
+
                     if isinstance(result, str) and result.startswith("Error"):
                         consecutive_tool_errors += 1
                     else:
@@ -716,10 +735,15 @@ class AgentLoop:
                 extra_system_prompt=extra_system_prompt,
             )
 
-        async def _bus_progress(content: str, *, tool_hint: bool = False) -> None:
+        async def _bus_progress(content: str, *, tool_hint: bool = False, **kwargs: Any) -> None:
             meta = dict(msg.metadata or {})
             meta["_progress"] = True
             meta["_tool_hint"] = tool_hint
+            for k, v in kwargs.items():
+                if v is not None:
+                    if k == "tool_result" and isinstance(v, str) and len(v) > self._TOOL_RESULT_MAX_CHARS:
+                        v = v[: self._TOOL_RESULT_MAX_CHARS] + "\n... (truncated)"
+                    meta["_" + k] = v
             await self.bus.publish_outbound(OutboundMessage(
                 channel=msg.channel, chat_id=msg.chat_id, content=content, metadata=meta,
             ))

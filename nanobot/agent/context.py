@@ -15,7 +15,7 @@ from nanobot.agent.skills import SkillsLoader
 class ContextBuilder:
     """Builds the context (system prompt + messages) for the agent."""
     
-    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "IDENTITY.md"]
+    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "IDENTITY.md", "ORCHESTRATOR.md"]
     _RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"
     
     def __init__(self, workspace: Path):

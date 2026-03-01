@@ -102,6 +102,11 @@ class ChannelManager:
                     timeout=1.0
                 )
                 
+                # Tool result visibility: skip unless send_tool_results is enabled
+                if msg.metadata.get("_reply_kind") == "tool_result":
+                    if not self.config.channels.send_tool_results:
+                        continue
+
                 if msg.metadata.get("_progress"):
                     if msg.metadata.get("_tool_hint") and not self.config.channels.send_tool_hints:
                         continue

@@ -8,7 +8,7 @@ from typing import Any
 
 from loguru import logger
 
-from nanobot.bus.events import InboundMessage
+from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.providers.base import LLMProvider
 from nanobot.agent.tools.factory import build_tool_registry
@@ -137,16 +137,39 @@ class SubagentManager:
                     })
                     
                     # Execute tools
+                    _tool_result_max_chars = 500
                     for tool_call in response.tool_calls:
                         args_str = json.dumps(tool_call.arguments, ensure_ascii=False)
                         logger.debug("Subagent [{}] executing: {} with arguments: {}", task_id, tool_call.name, args_str)
                         result = await tools.execute(tool_call.name, tool_call.arguments)
+                        result_str = result if isinstance(result, str) else str(result)
                         messages.append({
                             "role": "tool",
                             "tool_call_id": tool_call.id,
                             "name": tool_call.name,
-                            "content": result,
+                            "content": result_str,
                         })
+                        # Emit tool result to bus for execution visibility (e.g. Feishu when send_tool_results is on)
+                        display = (
+                            result_str
+                            if len(result_str) <= _tool_result_max_chars
+                            else result_str[:_tool_result_max_chars] + "\n... (truncated)"
+                        )
+                        await self.bus.publish_outbound(
+                            OutboundMessage(
+                                channel=origin["channel"],
+                                chat_id=origin["chat_id"],
+                                content=f"【子任务 {label}】{tool_call.name}: {display}",
+                                metadata={
+                                    "_reply_kind": "tool_result",
+                                    "_tool_name": tool_call.name,
+                                    "_tool_result": display,
+                                    "_origin": "subagent",
+                                    "_task_id": task_id,
+                                    "_progress": True,
+                                },
+                            )
+                        )
                 else:
                     final_result = response.content
                     break

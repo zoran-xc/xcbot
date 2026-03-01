@@ -489,12 +489,18 @@ def agent(
         # Animated spinner is safe to use with prompt_toolkit input handling
         return console.status("[dim]nanobot is thinking...[/dim]", spinner="dots")
 
-    async def _cli_progress(content: str, *, tool_hint: bool = False) -> None:
+    async def _cli_progress(content: str, *, tool_hint: bool = False, **kwargs: object) -> None:
         ch = agent_loop.channels_config
-        if ch and tool_hint and not ch.send_tool_hints:
-            return
-        if ch and not tool_hint and not ch.send_progress:
-            return
+        reply_kind = kwargs.get("reply_kind")
+        if reply_kind == "tool_result":
+            if ch and not ch.send_tool_results:
+                return
+        elif tool_hint:
+            if ch and not ch.send_tool_hints:
+                return
+        else:
+            if ch and not ch.send_progress:
+                return
         console.print(f"  [dim]↳ {content}[/dim]")
 
     if message:
@@ -534,9 +540,14 @@ def agent(
                 while True:
                     try:
                         msg = await asyncio.wait_for(bus.consume_outbound(), timeout=1.0)
-                        if msg.metadata.get("_progress"):
+                        ch = agent_loop.channels_config
+                        if msg.metadata.get("_reply_kind") == "tool_result":
+                            if ch and not ch.send_tool_results:
+                                pass
+                            else:
+                                console.print(f"  [dim]↳ {msg.content}[/dim]")
+                        elif msg.metadata.get("_progress"):
                             is_tool_hint = msg.metadata.get("_tool_hint", False)
-                            ch = agent_loop.channels_config
                             if ch and is_tool_hint and not ch.send_tool_hints:
                                 pass
                             elif ch and not is_tool_hint and not ch.send_progress:
