@@ -270,7 +270,9 @@
           "chrome-devtools-mcp@latest",
           "--headless",
           "--no-usage-statistics",
-          "--no-performance-crux"
+          "--no-performance-crux",
+          "--chrome-arg=--no-sandbox",
+          "--chrome-arg=--disable-dev-shm-usage"
         ],
         "env": {},
         "url": "",
