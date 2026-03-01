@@ -9,6 +9,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
+import httpx
 from loguru import logger
 
 from nanobot.bus.events import OutboundMessage
@@ -181,6 +182,73 @@ def _extract_element_content(element: dict) -> list[str]:
     return parts
 
 
+def _get_mention_open_ids(message: Any) -> list[str]:
+    """Extract open_ids of mentioned users/bots from Feishu message (event.message).
+    Handles both SDK object (with .mentions) and dict-like structure.
+    """
+    mentions = getattr(message, "mentions", None)
+    if not mentions:
+        return []
+    ids: list[str] = []
+    for m in mentions:
+        id_val = getattr(m, "id", None)
+        if id_val is None and isinstance(m, dict):
+            id_val = m.get("id")
+        if isinstance(id_val, str):
+            ids.append(id_val)
+        elif id_val is not None:
+            oid = getattr(id_val, "open_id", None)
+            if isinstance(oid, str):
+                ids.append(oid)
+            elif isinstance(id_val, dict):
+                ids.append(id_val.get("open_id") or "")
+    return [x for x in ids if x]
+
+
+def _get_mention_keys_for_open_id(message: Any, open_id: str) -> list[str]:
+    """Get mention keys (e.g. @_user_1) in message content for the given open_id."""
+    mentions = getattr(message, "mentions", None)
+    if not mentions:
+        return []
+    keys: list[str] = []
+    for m in mentions:
+        id_val = getattr(m, "id", None)
+        if id_val is None and isinstance(m, dict):
+            id_val = m.get("id")
+        oid = id_val if isinstance(id_val, str) else (getattr(id_val, "open_id", None) if id_val else None)
+        if id_val is not None and not isinstance(id_val, str):
+            if isinstance(id_val, dict):
+                oid = id_val.get("open_id")
+        if oid == open_id:
+            k = getattr(m, "key", None) or (m.get("key") if isinstance(m, dict) else None)
+            if isinstance(k, str) and k:
+                keys.append(k)
+    return keys
+
+
+def _strip_mention_keys_from_text(text: str, keys: list[str]) -> str:
+    """Remove mention placeholders (e.g. @_user_1) from message text."""
+    if not text or not keys:
+        return text
+    out = text
+    for k in keys:
+        out = out.replace(k, "").replace(k.strip(), "")
+    return re.sub(r"\s+", " ", out).strip()
+
+
+# Feishu text content uses @_user_1, @_user_2, ... as placeholders for @mentions.
+# These are NOT open_ids — the real open_id is in event.message.mentions[].id.
+_USER_MENTION_RE = re.compile(r"@_user_\d+\s*")
+
+
+def _strip_feishu_mention_placeholders(text: str) -> str:
+    """Strip all @_user_N placeholders from Feishu message text so the model sees clean content."""
+    if not text or not text.strip():
+        return text
+    out = _USER_MENTION_RE.sub(" ", text)
+    return re.sub(r"\s+", " ", out).strip()
+
+
 def _extract_post_content(content_json: dict) -> tuple[str, list[str]]:
     """Extract text and image keys from Feishu post (rich text) message content.
     
@@ -269,6 +337,76 @@ class FeishuChannel(BaseChannel):
         self._ws_thread: threading.Thread | None = None
         self._ws_client: Any = None
         self._processed_message_ids: OrderedDict[str, None] = OrderedDict()  # Ordered dedup cache
+
+    async def _fetch_group_history(self, chat_id: str, page_size: int) -> str:
+        """Fetch recent messages from Feishu group chat via REST API.
+        Requires app to have 'get group messages' permission (获取群组中所有消息).
+        Returns a formatted string for use as extra context, or empty string on failure.
+        """
+        if page_size <= 0 or not self.config.app_id or not self.config.app_secret:
+            return ""
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                # Get tenant_access_token
+                token_resp = await client.post(
+                    "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+                    json={"app_id": self.config.app_id, "app_secret": self.config.app_secret},
+                )
+                token_resp.raise_for_status()
+                token_data = token_resp.json()
+                if token_data.get("code", 0) != 0:
+                    logger.warning("Feishu tenant_access_token failed: {}", token_data)
+                    return ""
+                token = token_data.get("tenant_access_token", "")
+                if not token:
+                    return ""
+
+                # List messages (container_id_type=chat, container_id=chat_id)
+                list_resp = await client.get(
+                    "https://open.feishu.cn/open-apis/im/v1/messages",
+                    params={
+                        "container_id_type": "chat",
+                        "container_id": chat_id,
+                        "page_size": min(page_size, 50),
+                    },
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+                list_resp.raise_for_status()
+                list_data = list_resp.json()
+                if list_data.get("code", 0) != 0:
+                    logger.debug("Feishu list messages failed: {}", list_data)
+                    return ""
+                data = list_data.get("data") or {}
+                items = data.get("items") or []
+        except Exception as e:
+            logger.debug("Feishu fetch group history failed: {}", e)
+            return ""
+
+        if not items:
+            return ""
+
+        lines = ["## 群聊最近消息（Feishu）"]
+        for it in items:
+            msg_id = it.get("message_id", "")
+            create_time = it.get("create_time", "")
+            sender_obj = it.get("sender") or {}
+            sender_id = sender_obj.get("id", "") if isinstance(sender_obj, dict) else ""
+            body = it.get("body") or {}
+            content = ""
+            if isinstance(body, dict):
+                raw = body.get("content")
+                if isinstance(raw, str):
+                    try:
+                        content_json = json.loads(raw)
+                        content = content_json.get("text", str(content_json)) if isinstance(content_json, dict) else str(content_json)
+                    except Exception:
+                        content = raw[:300]
+                elif raw is not None:
+                    content = str(raw)[:300]
+            if not content:
+                content = "(无文本)"
+            lines.append(f"- [{create_time}] sender={sender_id}: {content}")
+        return "\n".join(lines)
         
     
     async def start(self) -> None:
@@ -767,6 +905,24 @@ class FeishuChannel(BaseChannel):
             chat_type = message.chat_type
             msg_type = message.message_type
 
+            # In group chats: only reply when the bot is @mentioned (if require_mention_in_group is set)
+            if chat_type == "group" and getattr(self.config, "require_mention_in_group", False):
+                bot_open_id = (getattr(self.config, "bot_open_id", None) or "").strip()
+                if not bot_open_id:
+                    logger.warning(
+                        "Feishu require_mention_in_group is True but bot_open_id is not set; "
+                        "set bot_open_id in config (e.g. from Feishu open platform / bot info) to enable @-reply in groups"
+                    )
+                    return
+                mentioned_open_ids = _get_mention_open_ids(message)
+                if bot_open_id not in mentioned_open_ids:
+                    logger.debug(
+                        "Feishu group message ignored (bot not @mentioned). message_id={} chat_id={}",
+                        message_id,
+                        chat_id,
+                    )
+                    return
+
             # Add reaction
             await self._add_reaction(message_id, self.config.react_emoji)
 
@@ -814,6 +970,20 @@ class FeishuChannel(BaseChannel):
 
             content = "\n".join(content_parts) if content_parts else ""
 
+            # In group chats, strip @_user_N placeholders so the model sees clean text.
+            # (_user_1 is NOT the open_id — the real open_id is in message.mentions[].id)
+            if content and chat_type == "group":
+                content = _strip_feishu_mention_placeholders(content)
+            # Optionally strip by bot mention key when bot_open_id is set (for other formats)
+            if content and chat_type == "group":
+                bot_open_id = (getattr(self.config, "bot_open_id", None) or "").strip()
+                if bot_open_id:
+                    keys = _get_mention_keys_for_open_id(message, bot_open_id)
+                    if keys:
+                        content = _strip_mention_keys_from_text(content, keys)
+                if not content.strip() and not media_paths:
+                    content = "(用户仅 @ 了机器人，未输入其他文字)"
+
             if not content and not media_paths:
                 if msg_type in ("text", "post", "interactive"):
                     logger.debug(
@@ -832,6 +1002,18 @@ class FeishuChannel(BaseChannel):
                     )
                     return
 
+            # Optionally fetch recent group chat history for context (requires "get group messages" permission)
+            metadata: dict[str, Any] = {
+                "message_id": message_id,
+                "chat_type": chat_type,
+                "msg_type": msg_type,
+            }
+            fetch_size = getattr(self.config, "fetch_group_history_size", 0) or 0
+            if fetch_size > 0 and chat_type == "group":
+                recent = await self._fetch_group_history(chat_id, fetch_size)
+                if recent:
+                    metadata["feishu_recent_context"] = recent
+
             # Forward to message bus
             reply_to = chat_id if chat_type == "group" else sender_id
             await self._handle_message(
@@ -839,11 +1021,7 @@ class FeishuChannel(BaseChannel):
                 chat_id=reply_to,
                 content=content,
                 media=media_paths,
-                metadata={
-                    "message_id": message_id,
-                    "chat_type": chat_type,
-                    "msg_type": msg_type,
-                }
+                metadata=metadata,
             )
 
         except Exception as e:

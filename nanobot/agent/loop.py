@@ -157,6 +157,7 @@ class AgentLoop:
             send_callback=self.bus.publish_outbound,
             subagent_manager=self.subagents,
             cron_service=self.cron_service,
+            channels_config=self.channels_config,
         )
 
     async def _connect_mcp(self) -> None:
@@ -183,7 +184,7 @@ class AgentLoop:
 
     def _set_tool_context(self, channel: str, chat_id: str, message_id: str | None = None) -> None:
         """Update context for all tools that need routing info."""
-        for name in ("message", "spawn", "tasks", "cron"):
+        for name in ("message", "spawn", "tasks", "cron", "feishu_chat_history"):
             if tool := self.tools.get(name):
                 if hasattr(tool, "set_context"):
                     tool.set_context(channel, chat_id, *([message_id] if name == "message" else []))
@@ -909,7 +910,14 @@ class AgentLoop:
                 channel=msg.channel, chat_id=msg.chat_id, content=content, metadata=meta,
             ))
 
-        msgs = await _build(None)
+        # Inject Feishu group recent context as extra system prompt when present
+        extra_system_prompt = None
+        if msg.channel == "feishu" and (meta := (msg.metadata or {})):
+            feishu_recent = meta.get("feishu_recent_context")
+            if isinstance(feishu_recent, str) and feishu_recent.strip():
+                extra_system_prompt = feishu_recent.strip()
+
+        msgs = await _build(extra_system_prompt)
         outcome = await self._run_single_attempt(
             msgs,
             on_progress=on_progress or _bus_progress,

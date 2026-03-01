@@ -11,7 +11,13 @@
       "memoryWindow": 100,
       "contextCompactionTriggerTokens": 38000,
       "contextCompactionMaxRounds": 3,
-      "interruptOnNewMessage": true
+      "interruptOnNewMessage": true,
+      "preWaitSeconds": 5,
+      "waitReminderIntervalSeconds": 5,
+      "waitReminderMaxSeconds": 60,
+      "subagentWaitReminderMaxSeconds": 120,
+      "waitReminderAiModel": "Pro/deepseek-ai/DeepSeek-V3.2",
+      "enableWaitReminder": true
     }
   },
   "channels": {
@@ -46,7 +52,10 @@
       "verificationToken": "L2LS4DIef2ILm1uqWBBkxdMz1VUifyVA",
       "allowFrom": [],
       "reactEmoji": "Get",
-      "useCard": true
+      "useCard": true,
+      "requireMentionInGroup": true,
+      "botOpenId": "",
+      "fetchGroupHistorySize": 20
     },
     "mochat": {
       "enabled": false,

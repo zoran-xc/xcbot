@@ -446,6 +446,32 @@ Uses **WebSocket** long connection — no public IP required.
 > `encryptKey` and `verificationToken` are optional for Long Connection mode.
 > `allowFrom`: Leave empty to allow all users, or add `["ou_xxx"]` to restrict access.
 
+**Bot ID (bot_open_id) — 机器人 open_id 怎么查？**
+
+When using `requireMentionInGroup: true`, you must set `botOpenId` so the bot knows when it is @mentioned. Ways to get the bot's open_id:
+
+1. **From event (recommended)**  
+   In a group where the bot is added, have someone @ the bot. In your app logs or event handler, the received event's `message.mentions[]` contains entries with `id` (or `id.open_id`). The one that corresponds to your bot is the bot's open_id. Copy it into config as `botOpenId`.
+
+2. **Feishu API**  
+   Use the Feishu Open API to get bot info (e.g. “获取机器人信息” / get bot identity). The returned open_id is what you need.
+
+3. **Open Platform**  
+   In [Feishu Open Platform](https://open.feishu.cn/app) → your app → some apps show the bot’s identity (open_id) under “Credentials & Basic Info” or “Robot” section.
+
+**Optional: group-only reply when @mentioned**
+
+```json
+"feishu": {
+  "requireMentionInGroup": true,
+  "botOpenId": "ou_xxxx"
+}
+```
+
+**Optional: AI tool to fetch chat history**
+
+When Feishu is enabled, the agent gets a built-in tool `feishu_chat_history` to pull recent messages from the current chat (by count or time range, with pagination). Ensure the app has the **“获取群组中所有消息”** permission in the Feishu Open Platform.
+
 **3. Run**
 
 ```bash

@@ -6,7 +6,7 @@ Centralizes tool registration for main agent and subagents.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Awaitable, Callable
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
 from nanobot.agent.tools.registry import ToolRegistry
@@ -30,6 +30,7 @@ def build_tool_registry(
     send_callback: Callable[["OutboundMessage"], Awaitable[None]] | None = None,
     subagent_manager: "SubagentManager" | None = None,
     cron_service: "CronService" | None = None,
+    channels_config: Any = None,
 ) -> ToolRegistry:
     tools = ToolRegistry()
 
@@ -76,5 +77,12 @@ def build_tool_registry(
             from nanobot.agent.tools.cron import CronTool
 
             tools.register(CronTool(cron_service))
+
+        # Feishu-only: fetch chat history (only when Feishu channel is enabled)
+        if channels_config:
+            feishu = getattr(channels_config, "feishu", None)
+            if feishu and getattr(feishu, "enabled", False):
+                from nanobot.agent.tools.feishu_chat_history import FeishuChatHistoryTool
+                tools.register(FeishuChatHistoryTool(config=feishu))
 
     return tools
