@@ -49,6 +49,66 @@ MSG_TYPE_MAP = {
 }
 
 
+def _event_to_loggable(obj: Any) -> Any:
+    """Convert Feishu event (SDK object) to JSON-serializable dict for logging."""
+    if obj is None:
+        return None
+    if hasattr(obj, "model_dump"):
+        return _event_to_loggable(obj.model_dump())
+    if hasattr(obj, "to_dict"):
+        return _event_to_loggable(obj.to_dict())
+    if isinstance(obj, dict):
+        return {k: _event_to_loggable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_event_to_loggable(x) for x in obj]
+    if hasattr(obj, "__dict__") and not isinstance(obj, type):
+        return {k: _event_to_loggable(v) for k, v in vars(obj).items()}
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+    return str(obj)
+
+
+def _get_mention_key_to_name(message: Any) -> dict[str, str]:
+    """Build map from mention key (e.g. @_user_1) to display name from message.mentions.
+
+    Feishu event structure (event.message.mentions[]):
+        {"key": "@_user_1", "id": {"open_id": "ou_xxx", ...}, "name": "Tom", "tenant_key": "..."}
+    """
+    mentions = getattr(message, "mentions", None)
+    if not mentions:
+        return {}
+    out: dict[str, str] = {}
+    for m in mentions:
+        key = getattr(m, "key", None) or (m.get("key") if isinstance(m, dict) else None)
+        if not isinstance(key, str) or not key.strip():
+            continue
+        key = key.strip()
+        name = getattr(m, "name", None) or (m.get("name") if isinstance(m, dict) else None)
+        if isinstance(name, str) and name.strip():
+            out[key] = name.strip()
+        elif isinstance(name, dict):
+            n = name.get("name") or name.get("text") or name.get("content")
+            if isinstance(n, str) and n.strip():
+                out[key] = n.strip()
+    return out
+
+
+def _replace_mention_placeholders_with_names(text: str, message: Any) -> str:
+    """Replace @_user_N placeholders in text with real user names from message.mentions."""
+    if not text or not text.strip():
+        return text
+    key_to_name = _get_mention_key_to_name(message)
+    if not key_to_name:
+        return text
+    out = text
+    for key, name in key_to_name.items():
+        if not key or not name:
+            continue
+        display = f"@{name}" if not name.startswith("@") else name
+        out = out.replace(key, display)
+    return out
+
+
 def _extract_share_card_content(content_json: dict, msg_type: str) -> str:
     """Extract text representation from share cards and interactive messages."""
     parts = []
@@ -882,6 +942,16 @@ class FeishuChannel(BaseChannel):
     async def _on_message(self, data: "P2ImMessageReceiveV1") -> None:
         """Handle incoming message from Feishu."""
         try:
+            # Log full event body to console for debugging (structure of request/event)
+            try:
+                body = _event_to_loggable(data)
+                logger.info(
+                    "Feishu event full body:\n{}",
+                    json.dumps(body, ensure_ascii=False, indent=2),
+                )
+            except Exception as e:
+                logger.warning("Feishu event body dump failed: {}", e)
+
             event = data.event
             message = event.message
             sender = event.sender
@@ -905,7 +975,8 @@ class FeishuChannel(BaseChannel):
             chat_type = message.chat_type
             msg_type = message.message_type
 
-            # In group chats: only reply when the bot is @mentioned (if require_mention_in_group is set)
+            # When require_mention_in_group: messages that don't @ the bot are saved but don't trigger reply
+            save_only_no_reply = False
             if chat_type == "group" and getattr(self.config, "require_mention_in_group", False):
                 bot_open_id = (getattr(self.config, "bot_open_id", None) or "").strip()
                 if not bot_open_id:
@@ -916,15 +987,11 @@ class FeishuChannel(BaseChannel):
                     return
                 mentioned_open_ids = _get_mention_open_ids(message)
                 if bot_open_id not in mentioned_open_ids:
-                    logger.debug(
-                        "Feishu group message ignored (bot not @mentioned). message_id={} chat_id={}",
-                        message_id,
-                        chat_id,
-                    )
-                    return
+                    save_only_no_reply = True  # save to session, do not trigger AI reply
 
-            # Add reaction
-            await self._add_reaction(message_id, self.config.react_emoji)
+            # Add reaction only when we will actually reply (skip for save-only to avoid noise)
+            if not save_only_no_reply:
+                await self._add_reaction(message_id, self.config.react_emoji)
 
             # Parse content
             content_parts = []
@@ -970,19 +1037,9 @@ class FeishuChannel(BaseChannel):
 
             content = "\n".join(content_parts) if content_parts else ""
 
-            # In group chats, strip @_user_N placeholders so the model sees clean text.
-            # (_user_1 is NOT the open_id — the real open_id is in message.mentions[].id)
-            if content and chat_type == "group":
-                content = _strip_feishu_mention_placeholders(content)
-            # Optionally strip by bot mention key when bot_open_id is set (for other formats)
-            if content and chat_type == "group":
-                bot_open_id = (getattr(self.config, "bot_open_id", None) or "").strip()
-                if bot_open_id:
-                    keys = _get_mention_keys_for_open_id(message, bot_open_id)
-                    if keys:
-                        content = _strip_mention_keys_from_text(content, keys)
-                if not content.strip() and not media_paths:
-                    content = "(用户仅 @ 了机器人，未输入其他文字)"
+            # Replace @_user_N placeholders with real user names from message.mentions
+            if content:
+                content = _replace_mention_placeholders_with_names(content, message)
 
             if not content and not media_paths:
                 if msg_type in ("text", "post", "interactive"):
@@ -993,6 +1050,8 @@ class FeishuChannel(BaseChannel):
                         chat_type,
                     )
                     content = MSG_TYPE_MAP.get(msg_type, f"[{msg_type}]")
+                elif save_only_no_reply:
+                    content = "[无文本消息]"
                 else:
                     logger.debug(
                         "Feishu inbound message ignored due to empty content/media (type={}). message_id={} chat_type={}",
@@ -1008,6 +1067,8 @@ class FeishuChannel(BaseChannel):
                 "chat_type": chat_type,
                 "msg_type": msg_type,
             }
+            if save_only_no_reply:
+                metadata["save_only_no_reply"] = True
             fetch_size = getattr(self.config, "fetch_group_history_size", 0) or 0
             if fetch_size > 0 and chat_type == "group":
                 recent = await self._fetch_group_history(chat_id, fetch_size)

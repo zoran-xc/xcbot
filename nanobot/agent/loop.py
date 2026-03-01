@@ -682,12 +682,25 @@ class AgentLoop:
 
             if msg.content.strip().lower() == "/stop":
                 await self._handle_stop(msg)
+            elif msg.metadata.get("save_only_no_reply"):
+                # Save to session only, do not trigger AI reply (e.g. Feishu group message not @ bot)
+                await self._save_message_only(msg)
             else:
                 if self._interrupt_on_new_message:
                     await self._cancel_session_tasks(msg.session_key)
                 task = asyncio.create_task(self._dispatch(msg))
                 self._active_tasks.setdefault(msg.session_key, []).append(task)
                 task.add_done_callback(lambda t, k=msg.session_key: self._active_tasks.get(k, []) and self._active_tasks[k].remove(t) if t in self._active_tasks.get(k, []) else None)
+
+    async def _save_message_only(self, msg: InboundMessage) -> None:
+        """Append the message to the session without running the agent or sending a reply."""
+        key = msg.session_key
+        session = self.sessions.get_or_create(key)
+        extra = {}
+        if getattr(msg, "media", None):
+            extra["media"] = msg.media
+        session.add_message("user", msg.content, **extra)
+        self.sessions.save(session)
 
     async def _cancel_session_tasks(self, session_key: str) -> None:
         """Cancel in-flight main-agent tasks for this session (used when new message arrives and interrupt_on_new_message is True).
