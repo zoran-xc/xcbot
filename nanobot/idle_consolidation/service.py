@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
@@ -90,13 +90,16 @@ class IdleConsolidationService:
         if not s:
             return None
         try:
-            return datetime.fromisoformat(s)
+            dt = datetime.fromisoformat(s)
+            if dt.tzinfo is not None:
+                dt = dt.astimezone().replace(tzinfo=None)
+            return dt
         except Exception:
             return None
 
     @staticmethod
     def _now() -> datetime:
-        return datetime.now(timezone.utc).astimezone()
+        return datetime.now()
 
     def _get_last_user_ts(self, session) -> datetime | None:
         # session.messages contain persisted user text messages (runtime context tags are skipped on save)

@@ -263,6 +263,20 @@
     },
     "restrictToWorkspace": false,
     "mcpServers": {
+      "chrome-devtools": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "chrome-devtools-mcp@latest",
+          "--headless",
+          "--no-usage-statistics",
+          "--no-performance-crux"
+        ],
+        "env": {},
+        "url": "",
+        "headers": {},
+        "toolTimeout": 120
+      },
       "xiaohongshu": {
         "command": "",
         "args": [],
