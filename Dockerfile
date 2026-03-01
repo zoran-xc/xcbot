@@ -22,8 +22,8 @@ RUN mkdir -p nanobot bridge && touch nanobot/__init__.py && \
 
 # Build the WhatsApp bridge - cache npm install layer
 WORKDIR /app/bridge
-COPY bridge/package.json ./
-RUN npm install
+COPY bridge/package.json bridge/package-lock.json ./
+RUN npm ci
 COPY bridge/ ./
 RUN npm run build
 
