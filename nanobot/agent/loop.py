@@ -79,6 +79,9 @@ class AgentLoop:
         subagent_wait_reminder_max_seconds: float | None = None,
         wait_reminder_ai_model: str | None = None,
         enable_wait_reminder: bool | None = None,
+        subagent_trace_enabled: bool = True,
+        subagent_trace_dir: str = "subagents",
+        subagent_trace_max_chars: int = 8000,
     ):
         from nanobot.config.schema import ExecToolConfig
         self.bus = bus
@@ -131,6 +134,9 @@ class AgentLoop:
             wait_reminder_ai_model=self.wait_reminder_ai_model,
             enable_wait_reminder=self.enable_wait_reminder,
             pre_wait_seconds=self.pre_wait_seconds,
+            trace_enabled=subagent_trace_enabled,
+            trace_dir=subagent_trace_dir,
+            trace_max_chars=subagent_trace_max_chars,
         )
 
         self._running = False

@@ -73,6 +73,10 @@ def build_tool_registry(
 
         tools.register(SessionTool(workspace=workspace))
 
+        from nanobot.agent.tools.subagent_inspect import SubagentInspectTool
+
+        tools.register(SubagentInspectTool(workspace=workspace))
+
         if cron_service:
             from nanobot.agent.tools.cron import CronTool
 

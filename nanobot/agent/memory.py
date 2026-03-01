@@ -88,9 +88,21 @@ class MemoryStore:
     """Two-layer memory: MEMORY.md (long-term facts) + HISTORY.md (grep-searchable log)."""
 
     def __init__(self, workspace: Path):
+        self.workspace = workspace
         self.memory_dir = ensure_dir(workspace / "memory")
         self.memory_file = self.memory_dir / "MEMORY.md"
         self.history_file = self.memory_dir / "HISTORY.md"
+
+    def _load_consolidation_bootstrap(self) -> str:
+        parts: list[str] = []
+        for filename in ("AGENTS.md", "TOOLS.md"):
+            p = self.workspace / filename
+            try:
+                if p.exists():
+                    parts.append(f"## {filename}\n\n" + p.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+        return "\n\n".join(parts) if parts else ""
 
     def read_long_term(self) -> str:
         if self.memory_file.exists():
@@ -144,7 +156,11 @@ class MemoryStore:
             lines.append(f"[{m.get('timestamp', '?')[:16]}] {m['role'].upper()}{tools}: {m['content']}")
 
         current_memory = self.read_long_term()
+        bootstrap = self._load_consolidation_bootstrap()
         prompt = f"""Process this conversation and call the save_memory tool with your consolidation.
+
+## Agent Instructions (Read-only)
+{bootstrap or "(none)"}
 
 ## Current Long-term Memory
 {current_memory or "(empty)"}

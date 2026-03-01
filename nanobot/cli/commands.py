@@ -313,6 +313,9 @@ def gateway(
         subagent_wait_reminder_max_seconds=getattr(config.agents.defaults, "subagent_wait_reminder_max_seconds", 120.0),
         wait_reminder_ai_model=getattr(config.agents.defaults, "wait_reminder_ai_model", None),
         enable_wait_reminder=getattr(config.agents.defaults, "enable_wait_reminder", True),
+        subagent_trace_enabled=getattr(config.agents.defaults, "subagent_trace_enabled", True),
+        subagent_trace_dir=getattr(config.agents.defaults, "subagent_trace_dir", "subagents"),
+        subagent_trace_max_chars=getattr(config.agents.defaults, "subagent_trace_max_chars", 8000),
     )
     
     # Set cron callback (needs agent)
@@ -509,6 +512,9 @@ def agent(
         subagent_wait_reminder_max_seconds=getattr(config.agents.defaults, "subagent_wait_reminder_max_seconds", 120.0),
         wait_reminder_ai_model=getattr(config.agents.defaults, "wait_reminder_ai_model", None),
         enable_wait_reminder=getattr(config.agents.defaults, "enable_wait_reminder", True),
+        subagent_trace_enabled=getattr(config.agents.defaults, "subagent_trace_enabled", True),
+        subagent_trace_dir=getattr(config.agents.defaults, "subagent_trace_dir", "subagents"),
+        subagent_trace_max_chars=getattr(config.agents.defaults, "subagent_trace_max_chars", 8000),
     )
     
     # Show spinner when logs are off (no output to miss); skip when logs are on
@@ -1017,6 +1023,9 @@ def cron_run(
         subagent_wait_reminder_max_seconds=getattr(config.agents.defaults, "subagent_wait_reminder_max_seconds", 120.0),
         wait_reminder_ai_model=getattr(config.agents.defaults, "wait_reminder_ai_model", None),
         enable_wait_reminder=getattr(config.agents.defaults, "enable_wait_reminder", True),
+        subagent_trace_enabled=getattr(config.agents.defaults, "subagent_trace_enabled", True),
+        subagent_trace_dir=getattr(config.agents.defaults, "subagent_trace_dir", "subagents"),
+        subagent_trace_max_chars=getattr(config.agents.defaults, "subagent_trace_max_chars", 8000),
     )
 
     store_path = get_data_dir() / "cron" / "jobs.json"

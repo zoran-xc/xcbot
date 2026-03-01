@@ -3,6 +3,7 @@
 import asyncio
 import json
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,9 @@ class SubagentManager:
         wait_reminder_ai_model: str | None = None,
         enable_wait_reminder: bool = True,
         pre_wait_seconds: float = 5.0,
+        trace_enabled: bool = True,
+        trace_dir: str = "subagents",
+        trace_max_chars: int = 8000,
     ):
         from nanobot.config.schema import ExecToolConfig
         self.provider = provider
@@ -51,8 +55,40 @@ class SubagentManager:
         self.wait_reminder_ai_model = wait_reminder_ai_model
         self.enable_wait_reminder = enable_wait_reminder
         self.pre_wait_seconds = pre_wait_seconds
+        self.trace_enabled = trace_enabled
+        self.trace_dir = trace_dir
+        self.trace_max_chars = int(trace_max_chars)
         self._running_tasks: dict[str, asyncio.Task[None]] = {}
         self._session_tasks: dict[str, set[str]] = {}  # session_key -> {task_id, ...}
+
+    def _trace_path(self, task_id: str) -> Path:
+        return self.workspace / self.trace_dir / f"{task_id}.jsonl"
+
+    def _truncate(self, text: str | None) -> str:
+        if not text:
+            return ""
+        if self.trace_max_chars <= 0:
+            return text
+        if len(text) <= self.trace_max_chars:
+            return text
+        return text[: self.trace_max_chars] + "\n... (truncated)"
+
+    def _trace(self, task_id: str, event: str, payload: dict[str, Any]) -> None:
+        if not self.trace_enabled:
+            return
+        try:
+            path = self._trace_path(task_id)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            line = {
+                "ts": datetime.now().isoformat(timespec="seconds"),
+                "task_id": task_id,
+                "event": event,
+                **payload,
+            }
+            with path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(line, ensure_ascii=False) + "\n")
+        except Exception as e:
+            logger.debug("Failed to write subagent trace for {}: {}", task_id, e)
     
     async def spawn(
         self,
@@ -66,6 +102,17 @@ class SubagentManager:
         task_id = str(uuid.uuid4())[:8]
         display_label = label or task[:30] + ("..." if len(task) > 30 else "")
         origin = {"channel": origin_channel, "chat_id": origin_chat_id}
+
+        self._trace(
+            task_id,
+            "spawn",
+            {
+                "label": display_label,
+                "task": self._truncate(task),
+                "origin": origin,
+                "session_key": session_key,
+            },
+        )
 
         bg_task = asyncio.create_task(
             self._run_subagent(task_id, task, display_label, origin)
@@ -84,7 +131,7 @@ class SubagentManager:
         bg_task.add_done_callback(_cleanup)
         
         logger.info("Spawned subagent [{}]: {}", task_id, display_label)
-        return f"Subagent [{display_label}] started (id: {task_id}). I'll notify you when it completes."
+        return f"Subagent [{display_label}] started (task_id={task_id}). I'll notify you when it completes."
     
     async def _run_subagent(
         self,
@@ -95,6 +142,17 @@ class SubagentManager:
     ) -> None:
         """Execute the subagent task and announce the result."""
         logger.info("Subagent [{}] starting task: {}", task_id, label)
+
+        self._trace(
+            task_id,
+            "start",
+            {
+                "label": label,
+                "task": self._truncate(task),
+                "origin": origin,
+                "model": self.model,
+            },
+        )
         
         try:
             # Build subagent tools (no message tool, no spawn tool)
@@ -120,6 +178,15 @@ class SubagentManager:
             
             while iteration < max_iterations:
                 iteration += 1
+
+                self._trace(
+                    task_id,
+                    "llm_request",
+                    {
+                        "iteration": iteration,
+                        "messages_count": len(messages),
+                    },
+                )
 
                 if self.enable_wait_reminder and origin.get("channel") and origin.get("chat_id"):
                     try:
@@ -175,12 +242,32 @@ class SubagentManager:
                         "content": response.content or "",
                         "tool_calls": tool_call_dicts,
                     })
+
+                    self._trace(
+                        task_id,
+                        "llm_tool_calls",
+                        {
+                            "iteration": iteration,
+                            "content": self._truncate(response.content or ""),
+                            "tool_calls": tool_call_dicts,
+                        },
+                    )
                     
                     # Execute tools
                     _tool_result_max_chars = 500
                     for tool_call in response.tool_calls:
                         args_str = json.dumps(tool_call.arguments, ensure_ascii=False)
                         logger.debug("Subagent [{}] executing: {} with arguments: {}", task_id, tool_call.name, args_str)
+
+                        self._trace(
+                            task_id,
+                            "tool_start",
+                            {
+                                "iteration": iteration,
+                                "tool_name": tool_call.name,
+                                "arguments": self._truncate(args_str),
+                            },
+                        )
                         if self.enable_wait_reminder and origin.get("channel") and origin.get("chat_id"):
                             try:
                                 result = await run_with_ai_wait_reminder(
@@ -209,6 +296,16 @@ class SubagentManager:
                             "name": tool_call.name,
                             "content": result_str,
                         })
+
+                        self._trace(
+                            task_id,
+                            "tool_end",
+                            {
+                                "iteration": iteration,
+                                "tool_name": tool_call.name,
+                                "result": self._truncate(result_str),
+                            },
+                        )
                         # Emit tool result to bus for execution visibility (e.g. Feishu when send_tool_results is on)
                         display = (
                             result_str
@@ -232,17 +329,41 @@ class SubagentManager:
                         )
                 else:
                     final_result = response.content
+                    self._trace(
+                        task_id,
+                        "llm_final",
+                        {
+                            "iteration": iteration,
+                            "content": self._truncate(final_result or ""),
+                        },
+                    )
                     break
             
             if final_result is None:
                 final_result = "Task completed but no final response was generated."
             
             logger.info("Subagent [{}] completed successfully", task_id)
+            self._trace(
+                task_id,
+                "end",
+                {
+                    "status": "ok",
+                    "result": self._truncate(final_result),
+                },
+            )
             await self._announce_result(task_id, label, task, final_result, origin, "ok")
             
         except Exception as e:
             error_msg = f"Error: {str(e)}"
             logger.error("Subagent [{}] failed: {}", task_id, e)
+            self._trace(
+                task_id,
+                "end",
+                {
+                    "status": "error",
+                    "error": self._truncate(error_msg),
+                },
+            )
             await self._announce_result(task_id, label, task, error_msg, origin, "error")
     
     async def _announce_result(

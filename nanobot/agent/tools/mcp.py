@@ -57,16 +57,68 @@ class MCPToolWrapper(Tool):
     def parameters(self) -> dict[str, Any]:
         return self._parameters
 
+    def validate_params(self, params: dict[str, Any]) -> list[str]:
+        try:
+            def _is_uid_key(key: str) -> bool:
+                return key == "uid" or key.endswith("_uid") or key.endswith("Uid") or key.endswith("UID")
+
+            def _coerce(obj: Any) -> Any:
+                if isinstance(obj, dict):
+                    for kk, vv in list(obj.items()):
+                        if isinstance(kk, str) and _is_uid_key(kk) and vv is not None and not isinstance(vv, str):
+                            obj[kk] = str(vv)
+                        else:
+                            obj[kk] = _coerce(vv)
+                    return obj
+                if isinstance(obj, list):
+                    for i, item in enumerate(list(obj)):
+                        obj[i] = _coerce(item)
+                    return obj
+                return obj
+
+            _coerce(params or {})
+        except Exception:
+            pass
+        return super().validate_params(params)
+
     async def execute(self, **kwargs: Any) -> str:
         from mcp import types
         try:
+            logger.info(
+                "MCP tool call request: tool='{}' original='{}' args={}",
+                self._name,
+                self._original_name,
+                kwargs,
+            )
             result = await asyncio.wait_for(
                 self._session.call_tool(self._original_name, arguments=kwargs),
                 timeout=self._tool_timeout,
             )
+            try:
+                logger.info(
+                    "MCP tool call response: tool='{}' original='{}' result={}",
+                    self._name,
+                    self._original_name,
+                    result,
+                )
+            except Exception:
+                logger.info(
+                    "MCP tool call response: tool='{}' original='{}' (failed to stringify result)",
+                    self._name,
+                    self._original_name,
+                )
         except asyncio.TimeoutError:
             logger.warning("MCP tool '{}': timed out after {}s", self._name, self._tool_timeout)
             return f"(MCP tool call timed out after {self._tool_timeout}s)"
+        except Exception as e:
+            logger.exception(
+                "MCP tool call error: tool='{}' original='{}' args={} error={}",
+                self._name,
+                self._original_name,
+                kwargs,
+                e,
+            )
+            raise
         parts: list[str] = []
         for block in result.content:
             if isinstance(block, types.TextContent):

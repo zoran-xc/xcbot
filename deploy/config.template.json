@@ -17,7 +17,10 @@
       "waitReminderMaxSeconds": 60,
       "subagentWaitReminderMaxSeconds": 120,
       "waitReminderAiModel": "Pro/deepseek-ai/DeepSeek-V3.2",
-      "enableWaitReminder": true
+      "enableWaitReminder": true,
+      "subagentTraceEnabled": true,
+      "subagentTraceDir": "subagents",
+      "subagentTraceMaxChars": 8000
     }
   },
   "channels": {
@@ -268,6 +271,7 @@
         "args": [
           "-y",
           "chrome-devtools-mcp@latest",
+          "--isolated",
           "--headless",
           "--no-usage-statistics",
           "--no-performance-crux",

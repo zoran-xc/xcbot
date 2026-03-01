@@ -232,6 +232,9 @@ class AgentDefaults(Base):
     subagent_wait_reminder_max_seconds: float = 120.0  # Max seconds to wait per blocking call for subagents
     wait_reminder_ai_model: str | None = "Pro/deepseek-ai/DeepSeek-V3.2"  # Model used for wait-decision (fallback to main model if None)
     enable_wait_reminder: bool = True  # Enable AI-decided wait reminders for blocking calls
+    subagent_trace_enabled: bool = True
+    subagent_trace_dir: str = "subagents"
+    subagent_trace_max_chars: int = 8000
 
 
 class AgentsConfig(Base):
