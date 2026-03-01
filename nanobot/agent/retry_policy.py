@@ -109,7 +109,8 @@ def extract_tool_failures(messages: list[dict[str, Any]], *, max_items: int = 8)
         if not content.startswith("Error"):
             continue
         name = m.get("name") or "tool"
-        failures.append(f"{name}: {_truncate(content.replace('\n', ' '), 240)}")
+        compact = content.replace("\n", " ")
+        failures.append(f"{name}: {_truncate(compact, 240)}")
         if len(failures) >= max_items:
             break
     return failures

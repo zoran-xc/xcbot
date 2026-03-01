@@ -17,13 +17,7 @@ from nanobot.agent.memory import MemoryStore
 from nanobot.agent.subagent import SubagentManager
 from nanobot.agent.plan_header import PLAN_RULES, parse_plan_header
 from nanobot.agent.task_anchor import TaskAnchorEntry, TaskAnchorStore
-from nanobot.agent.tools.cron import CronTool
-from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
-from nanobot.agent.tools.message import MessageTool
-from nanobot.agent.tools.registry import ToolRegistry
-from nanobot.agent.tools.shell import ExecTool
-from nanobot.agent.tools.spawn import SpawnTool
-from nanobot.agent.tools.web import WebFetchTool, WebSearchTool
+from nanobot.agent.tools.factory import build_tool_registry
 from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.agent.retry_policy import AttemptTrace, build_failure_bundle, classify_error_message
@@ -107,7 +101,6 @@ class AgentLoop:
 
         self.context = ContextBuilder(workspace)
         self.sessions = session_manager or SessionManager(workspace)
-        self.tools = ToolRegistry()
         self.subagents = SubagentManager(
             provider=provider,
             workspace=workspace,
@@ -135,27 +128,16 @@ class AgentLoop:
 
     def _register_default_tools(self) -> None:
         """Register the default set of tools."""
-        allowed_dir = self.workspace if self.restrict_to_workspace else None
-        for cls in (ReadFileTool, WriteFileTool, EditFileTool, ListDirTool):
-            self.tools.register(cls(workspace=self.workspace, allowed_dir=allowed_dir))
-        self.tools.register(ExecTool(
-            working_dir=str(self.workspace),
-            timeout=self.exec_config.timeout,
+        self.tools = build_tool_registry(
+            mode="main",
+            workspace=self.workspace,
             restrict_to_workspace=self.restrict_to_workspace,
-            path_append=self.exec_config.path_append,
-        ))
-        self.tools.register(WebSearchTool(api_key=self.brave_api_key))
-        self.tools.register(WebFetchTool())
-        self.tools.register(MessageTool(send_callback=self.bus.publish_outbound))
-        self.tools.register(SpawnTool(manager=self.subagents))
-        from nanobot.agent.tools.tasks import TasksTool
-        self.tools.register(TasksTool(manager=self.subagents))
-        from nanobot.agent.tools.media import MediaTool
-        self.tools.register(MediaTool(workspace=self.workspace))
-        from nanobot.agent.tools.session_tools import SessionTool
-        self.tools.register(SessionTool(workspace=self.workspace))
-        if self.cron_service:
-            self.tools.register(CronTool(self.cron_service))
+            exec_config=self.exec_config,
+            brave_api_key=self.brave_api_key,
+            send_callback=self.bus.publish_outbound,
+            subagent_manager=self.subagents,
+            cron_service=self.cron_service,
+        )
 
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""
@@ -789,6 +771,7 @@ class AgentLoop:
 
         self._set_tool_context(msg.channel, msg.chat_id, msg.metadata.get("message_id"))
         if message_tool := self.tools.get("message"):
+            from nanobot.agent.tools.message import MessageTool
             if isinstance(message_tool, MessageTool):
                 message_tool.start_turn()
 
@@ -845,8 +828,10 @@ class AgentLoop:
             )
         self.sessions.save(session)
 
-        if (mt := self.tools.get("message")) and isinstance(mt, MessageTool) and mt._sent_in_turn:
-            return None
+        if (mt := self.tools.get("message")):
+            from nanobot.agent.tools.message import MessageTool
+            if isinstance(mt, MessageTool) and mt._sent_in_turn:
+                return None
 
         preview = final_content[:120] + "..." if len(final_content) > 120 else final_content
         logger.info("Response to {}:{}: {}", msg.channel, msg.sender_id, preview)
