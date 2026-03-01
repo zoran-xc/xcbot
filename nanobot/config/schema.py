@@ -218,6 +218,12 @@ class AgentDefaults(Base):
     context_compaction_trigger_tokens: int = 38_000
     context_compaction_max_rounds: int = 3
     interrupt_on_new_message: bool = True  # When True, new message in same session cancels current task and continues with full history
+    pre_wait_seconds: float = 5.0  # Seconds to sleep before starting a potentially blocking call (LLM/tools)
+    wait_reminder_interval_seconds: float = 5.0  # Default interval between AI wait-decision ticks
+    wait_reminder_max_seconds: float = 60.0  # Max seconds to wait per blocking call for main agent (0 = no cap)
+    subagent_wait_reminder_max_seconds: float = 120.0  # Max seconds to wait per blocking call for subagents
+    wait_reminder_ai_model: str | None = "Pro/deepseek-ai/DeepSeek-V3.2"  # Model used for wait-decision (fallback to main model if None)
+    enable_wait_reminder: bool = True  # Enable AI-decided wait reminders for blocking calls
 
 
 class AgentsConfig(Base):

@@ -12,11 +12,12 @@ from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.providers.base import LLMProvider
 from nanobot.agent.tools.factory import build_tool_registry
+from nanobot.agent.wait_reminder import run_with_ai_wait_reminder, WaitReminderTimeout
 
 
 class SubagentManager:
     """Manages background subagent execution."""
-    
+
     def __init__(
         self,
         provider: LLMProvider,
@@ -28,6 +29,12 @@ class SubagentManager:
         brave_api_key: str | None = None,
         exec_config: "ExecToolConfig | None" = None,
         restrict_to_workspace: bool = False,
+        *,
+        wait_reminder_interval_seconds: float = 5.0,
+        subagent_wait_reminder_max_seconds: float = 120.0,
+        wait_reminder_ai_model: str | None = None,
+        enable_wait_reminder: bool = True,
+        pre_wait_seconds: float = 5.0,
     ):
         from nanobot.config.schema import ExecToolConfig
         self.provider = provider
@@ -39,6 +46,11 @@ class SubagentManager:
         self.brave_api_key = brave_api_key
         self.exec_config = exec_config or ExecToolConfig()
         self.restrict_to_workspace = restrict_to_workspace
+        self.wait_reminder_interval_seconds = wait_reminder_interval_seconds
+        self.subagent_wait_reminder_max_seconds = subagent_wait_reminder_max_seconds
+        self.wait_reminder_ai_model = wait_reminder_ai_model
+        self.enable_wait_reminder = enable_wait_reminder
+        self.pre_wait_seconds = pre_wait_seconds
         self._running_tasks: dict[str, asyncio.Task[None]] = {}
         self._session_tasks: dict[str, set[str]] = {}  # session_key -> {task_id, ...}
     
@@ -108,15 +120,43 @@ class SubagentManager:
             
             while iteration < max_iterations:
                 iteration += 1
-                
-                response = await self.provider.chat(
-                    messages=messages,
-                    tools=tools.get_definitions(),
-                    model=self.model,
-                    temperature=self.temperature,
-                    max_tokens=self.max_tokens,
-                )
-                
+
+                if self.enable_wait_reminder and origin.get("channel") and origin.get("chat_id"):
+                    try:
+                        response = await run_with_ai_wait_reminder(
+                            self.provider,
+                            self.bus,
+                            self.provider.chat(
+                                messages=messages,
+                                tools=tools.get_definitions(),
+                                model=self.model,
+                                temperature=self.temperature,
+                                max_tokens=self.max_tokens,
+                            ),
+                            channel=origin["channel"],
+                            chat_id=origin["chat_id"],
+                            operation="LLM",
+                            task_summary=task[:200] + "…" if len(task) > 200 else task,
+                            pre_wait_seconds=self.pre_wait_seconds,
+                            wait_reminder_interval_seconds=self.wait_reminder_interval_seconds,
+                            wait_reminder_max_seconds=self.subagent_wait_reminder_max_seconds,
+                            wait_reminder_ai_model=self.wait_reminder_ai_model,
+                            main_model=self.model,
+                        )
+                    except WaitReminderTimeout as e:
+                        error_msg = f"Subagent timed out after {int(e.elapsed_seconds)} seconds"
+                        logger.warning("Subagent [{}] {}", task_id, error_msg)
+                        await self._announce_result(task_id, label, task, error_msg, origin, "error")
+                        return
+                else:
+                    response = await self.provider.chat(
+                        messages=messages,
+                        tools=tools.get_definitions(),
+                        model=self.model,
+                        temperature=self.temperature,
+                        max_tokens=self.max_tokens,
+                    )
+
                 if response.has_tool_calls:
                     # Add assistant message with tool calls
                     tool_call_dicts = [
@@ -141,7 +181,27 @@ class SubagentManager:
                     for tool_call in response.tool_calls:
                         args_str = json.dumps(tool_call.arguments, ensure_ascii=False)
                         logger.debug("Subagent [{}] executing: {} with arguments: {}", task_id, tool_call.name, args_str)
-                        result = await tools.execute(tool_call.name, tool_call.arguments)
+                        if self.enable_wait_reminder and origin.get("channel") and origin.get("chat_id"):
+                            try:
+                                result = await run_with_ai_wait_reminder(
+                                    self.provider,
+                                    self.bus,
+                                    tools.execute(tool_call.name, tool_call.arguments),
+                                    channel=origin["channel"],
+                                    chat_id=origin["chat_id"],
+                                    operation=f"tool: {tool_call.name}",
+                                    task_summary=tool_call.name,
+                                    pre_wait_seconds=self.pre_wait_seconds,
+                                    wait_reminder_interval_seconds=self.wait_reminder_interval_seconds,
+                                    wait_reminder_max_seconds=self.subagent_wait_reminder_max_seconds,
+                                    wait_reminder_ai_model=self.wait_reminder_ai_model,
+                                    main_model=self.model,
+                                )
+                            except WaitReminderTimeout as e:
+                                result = f"Error: operation timed out after {int(e.elapsed_seconds)} seconds"
+                                logger.warning("Subagent [{}] tool {} timeout", task_id, tool_call.name)
+                        else:
+                            result = await tools.execute(tool_call.name, tool_call.arguments)
                         result_str = result if isinstance(result, str) else str(result)
                         messages.append({
                             "role": "tool",

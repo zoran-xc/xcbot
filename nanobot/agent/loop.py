@@ -15,6 +15,7 @@ from loguru import logger
 from nanobot.agent.context import ContextBuilder
 from nanobot.agent.memory import MemoryStore
 from nanobot.agent.subagent import SubagentManager
+from nanobot.agent.wait_reminder import WaitReminderTimeout, run_with_ai_wait_reminder as wait_reminder_run
 from nanobot.agent.plan_header import PLAN_RULES, parse_plan_header
 from nanobot.agent.task_anchor import TaskAnchorEntry, TaskAnchorStore
 from nanobot.agent.tools.factory import build_tool_registry
@@ -72,11 +73,24 @@ class AgentLoop:
         mcp_servers: dict | None = None,
         channels_config: ChannelsConfig | None = None,
         interrupt_on_new_message: bool = True,
+        pre_wait_seconds: float | None = None,
+        wait_reminder_interval_seconds: float | None = None,
+        wait_reminder_max_seconds: float | None = None,
+        subagent_wait_reminder_max_seconds: float | None = None,
+        wait_reminder_ai_model: str | None = None,
+        enable_wait_reminder: bool | None = None,
     ):
         from nanobot.config.schema import ExecToolConfig
         self.bus = bus
         self.channels_config = channels_config
         self._interrupt_on_new_message = interrupt_on_new_message
+        # Wait-reminder configuration (fallbacks if not provided)
+        self.pre_wait_seconds = float(pre_wait_seconds) if pre_wait_seconds is not None else 5.0
+        self.wait_reminder_interval_seconds = float(wait_reminder_interval_seconds) if wait_reminder_interval_seconds is not None else 5.0
+        self.wait_reminder_max_seconds = float(wait_reminder_max_seconds) if wait_reminder_max_seconds is not None else 60.0
+        self.subagent_wait_reminder_max_seconds = float(subagent_wait_reminder_max_seconds) if subagent_wait_reminder_max_seconds is not None else 120.0
+        self.wait_reminder_ai_model = wait_reminder_ai_model
+        self.enable_wait_reminder = bool(enable_wait_reminder) if enable_wait_reminder is not None else True
         self.provider = provider
         self.workspace = workspace
         self.model = model or provider.get_default_model()
@@ -112,6 +126,11 @@ class AgentLoop:
             brave_api_key=brave_api_key,
             exec_config=self.exec_config,
             restrict_to_workspace=restrict_to_workspace,
+            wait_reminder_interval_seconds=self.wait_reminder_interval_seconds,
+            subagent_wait_reminder_max_seconds=self.subagent_wait_reminder_max_seconds,
+            wait_reminder_ai_model=self.wait_reminder_ai_model,
+            enable_wait_reminder=self.enable_wait_reminder,
+            pre_wait_seconds=self.pre_wait_seconds,
         )
 
         self._running = False
@@ -168,6 +187,75 @@ class AgentLoop:
             if tool := self.tools.get(name):
                 if hasattr(tool, "set_context"):
                     tool.set_context(channel, chat_id, *([message_id] if name == "message" else []))
+
+    async def _run_with_ai_wait_reminder(
+        self,
+        coro: Awaitable[Any],
+        *,
+        channel: str,
+        chat_id: str,
+        operation: str,
+        task_summary: str | None = None,
+        max_seconds: float | None = None,
+    ) -> Any:
+        """Run a blocking coroutine with AI-decided wait reminders; raises WaitReminderTimeout on max wait."""
+        if not self.enable_wait_reminder or not channel or not chat_id:
+            return await coro
+        max_sec = max_seconds if max_seconds is not None else self.wait_reminder_max_seconds
+        return await wait_reminder_run(
+            self.provider,
+            self.bus,
+            coro,
+            channel=channel,
+            chat_id=chat_id,
+            operation=operation,
+            task_summary=task_summary,
+            pre_wait_seconds=self.pre_wait_seconds,
+            wait_reminder_interval_seconds=self.wait_reminder_interval_seconds,
+            wait_reminder_max_seconds=max_sec,
+            wait_reminder_ai_model=self.wait_reminder_ai_model,
+            main_model=self.model,
+        )
+
+    def _attempt_outcome_after_timeout(
+        self,
+        messages: list[dict],
+        tools_used: list[str],
+        elapsed_seconds: float,
+        model: str,
+    ) -> Awaitable[_AttemptOutcome]:
+        """Inject a timeout notice into context and run one LLM turn so the AI can reply to the user."""
+
+        async def _run() -> AgentLoop._AttemptOutcome:
+            timeout_content = (
+                f"[System: 该操作已等待 {int(elapsed_seconds)} 秒超时。"
+                "请用一两句话向用户说明情况，并建议是否重试或换一种方式。直接回复给用户，不要调用工具。]"
+            )
+            timeout_msg = {"role": "user", "content": timeout_content}
+            messages_after = list(messages) + [timeout_msg]
+            try:
+                response = await self.provider.chat(
+                    messages=messages_after,
+                    tools=[],
+                    model=model,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                )
+                final = self._strip_think(response.content) if response.content else None
+                final_content = final or response.content or "请求已超时，请重试或换一种方式。"
+            except Exception as e:
+                logger.warning("Timeout follow-up LLM call failed: {}", e)
+                final_content = (
+                    f"该操作在等待 {int(elapsed_seconds)} 秒后超时。您可以重试或发送新消息继续。"
+                )
+            return self._AttemptOutcome(
+                final_content=final_content,
+                tools_used=tools_used,
+                messages=messages_after,
+                error_message=f"wait timeout ({int(elapsed_seconds)}s)",
+            )
+
+        return _run()
 
     @staticmethod
     def _strip_think(text: str | None) -> str | None:
@@ -309,14 +397,17 @@ class AgentLoop:
         self,
         initial_messages: list[dict],
         on_progress: Callable[..., Awaitable[None]] | None = None,
+        channel: str | None = None,
+        chat_id: str | None = None,
     ) -> tuple[str | None, list[str], list[dict]]:
         """Run the agent loop for a single attempt.
 
         The retry mechanism has been removed. Tool failures are surfaced directly
         in the tool results and/or final output.
         """
-
-        outcome = await self._run_single_attempt(initial_messages, on_progress=on_progress)
+        outcome = await self._run_single_attempt(
+            initial_messages, on_progress=on_progress, channel=channel, chat_id=chat_id
+        )
         return outcome.final_content, outcome.tools_used, outcome.messages
 
     async def _run_single_attempt(
@@ -324,6 +415,8 @@ class AgentLoop:
         initial_messages: list[dict],
         *,
         on_progress: Callable[..., Awaitable[None]] | None = None,
+        channel: str | None = None,
+        chat_id: str | None = None,
     ) -> _AttemptOutcome:
         """Run a single attempt of the tool-iteration loop."""
         messages = initial_messages
@@ -374,12 +467,40 @@ class AgentLoop:
                 logger.debug("No vision input; using model: {}", model)
 
             try:
-                response = await self.provider.chat(
-                    messages=messages,
-                    tools=self.tools.get_definitions(),
-                    model=model,
-                    temperature=self.temperature,
-                    max_tokens=self.max_tokens,
+                if self.enable_wait_reminder and channel and chat_id:
+                    task_summary = None
+                    for m in reversed(messages):
+                        if m.get("role") == "user":
+                            c = m.get("content")
+                            if isinstance(c, str) and c:
+                                task_summary = (c[:200] + "…") if len(c) > 200 else c
+                            break
+                    response = await self._run_with_ai_wait_reminder(
+                        self.provider.chat(
+                            messages=messages,
+                            tools=self.tools.get_definitions(),
+                            model=model,
+                            temperature=self.temperature,
+                            max_tokens=self.max_tokens,
+                        ),
+                        channel=channel,
+                        chat_id=chat_id,
+                        operation="LLM",
+                        task_summary=task_summary,
+                        max_seconds=self.wait_reminder_max_seconds,
+                    )
+                else:
+                    response = await self.provider.chat(
+                        messages=messages,
+                        tools=self.tools.get_definitions(),
+                        model=model,
+                        temperature=self.temperature,
+                        max_tokens=self.max_tokens,
+                    )
+            except WaitReminderTimeout as e:
+                logger.warning("LLM wait reminder timeout after {}s", e.elapsed_seconds)
+                return await self._attempt_outcome_after_timeout(
+                    messages, tools_used, e.elapsed_seconds, model
                 )
             except Exception as e:
                 logger.error("LLM call raised exception (model={}): {}", model, e)
@@ -431,8 +552,27 @@ class AgentLoop:
                     tools_used.append(tool_call.name)
                     args_str = json.dumps(tool_call.arguments, ensure_ascii=False)
                     logger.info("Tool call: {}({})", tool_call.name, args_str[:200])
-                    # ToolRegistry.execute already catches exceptions and returns an error string.
-                    result = await self.tools.execute(tool_call.name, tool_call.arguments)
+                    try:
+                        if self.enable_wait_reminder and channel and chat_id:
+                            result = await self._run_with_ai_wait_reminder(
+                                self.tools.execute(tool_call.name, tool_call.arguments),
+                                channel=channel,
+                                chat_id=chat_id,
+                                operation=f"tool: {tool_call.name}",
+                                task_summary=tool_call.name,
+                                max_seconds=self.wait_reminder_max_seconds,
+                            )
+                        else:
+                            result = await self.tools.execute(tool_call.name, tool_call.arguments)
+                    except WaitReminderTimeout as e:
+                        logger.warning(
+                            "Tool {} wait reminder timeout after {}s",
+                            tool_call.name,
+                            e.elapsed_seconds,
+                        )
+                        return await self._attempt_outcome_after_timeout(
+                            messages, tools_used, e.elapsed_seconds, model
+                        )
                     messages = self.context.add_tool_result(messages, tool_call.id, tool_call.name, result)
 
                     # Emit tool result to channel when on_progress supports reply_kind (e.g. for execution visibility)
@@ -549,7 +689,8 @@ class AgentLoop:
                 task.add_done_callback(lambda t, k=msg.session_key: self._active_tasks.get(k, []) and self._active_tasks[k].remove(t) if t in self._active_tasks.get(k, []) else None)
 
     async def _cancel_session_tasks(self, session_key: str) -> None:
-        """Cancel in-flight tasks for this session (used when new message arrives and interrupt_on_new_message is True).
+        """Cancel in-flight main-agent tasks for this session (used when new message arrives and interrupt_on_new_message is True).
+        Only the current user-facing agent's run is cancelled; subagents already dispatched keep running.
         Session history is unchanged; the new message will be processed with full history including the interrupted one.
         """
         tasks = self._active_tasks.pop(session_key, [])
@@ -648,7 +789,9 @@ class AgentLoop:
                 )
 
             msgs = await _build(None)
-            outcome = await self._run_single_attempt(msgs, on_progress=on_progress)
+            outcome = await self._run_single_attempt(
+                msgs, on_progress=on_progress, channel=channel, chat_id=chat_id
+            )
             final_content = outcome.final_content
             all_msgs = outcome.messages
 
@@ -770,6 +913,8 @@ class AgentLoop:
         outcome = await self._run_single_attempt(
             msgs,
             on_progress=on_progress or _bus_progress,
+            channel=msg.channel,
+            chat_id=msg.chat_id,
         )
         final_content = outcome.final_content
         tools_used = outcome.tools_used

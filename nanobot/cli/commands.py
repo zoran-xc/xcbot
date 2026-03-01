@@ -306,6 +306,12 @@ def gateway(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         interrupt_on_new_message=getattr(config.agents.defaults, "interrupt_on_new_message", True),
+        pre_wait_seconds=getattr(config.agents.defaults, "pre_wait_seconds", 5.0),
+        wait_reminder_interval_seconds=getattr(config.agents.defaults, "wait_reminder_interval_seconds", 5.0),
+        wait_reminder_max_seconds=getattr(config.agents.defaults, "wait_reminder_max_seconds", 60.0),
+        subagent_wait_reminder_max_seconds=getattr(config.agents.defaults, "subagent_wait_reminder_max_seconds", 120.0),
+        wait_reminder_ai_model=getattr(config.agents.defaults, "wait_reminder_ai_model", None),
+        enable_wait_reminder=getattr(config.agents.defaults, "enable_wait_reminder", True),
     )
     
     # Set cron callback (needs agent)
@@ -481,6 +487,12 @@ def agent(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         interrupt_on_new_message=getattr(config.agents.defaults, "interrupt_on_new_message", True),
+        pre_wait_seconds=getattr(config.agents.defaults, "pre_wait_seconds", 5.0),
+        wait_reminder_interval_seconds=getattr(config.agents.defaults, "wait_reminder_interval_seconds", 5.0),
+        wait_reminder_max_seconds=getattr(config.agents.defaults, "wait_reminder_max_seconds", 60.0),
+        subagent_wait_reminder_max_seconds=getattr(config.agents.defaults, "subagent_wait_reminder_max_seconds", 120.0),
+        wait_reminder_ai_model=getattr(config.agents.defaults, "wait_reminder_ai_model", None),
+        enable_wait_reminder=getattr(config.agents.defaults, "enable_wait_reminder", True),
     )
     
     # Show spinner when logs are off (no output to miss); skip when logs are on
@@ -983,6 +995,12 @@ def cron_run(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         interrupt_on_new_message=getattr(config.agents.defaults, "interrupt_on_new_message", True),
+        pre_wait_seconds=getattr(config.agents.defaults, "pre_wait_seconds", 5.0),
+        wait_reminder_interval_seconds=getattr(config.agents.defaults, "wait_reminder_interval_seconds", 5.0),
+        wait_reminder_max_seconds=getattr(config.agents.defaults, "wait_reminder_max_seconds", 60.0),
+        subagent_wait_reminder_max_seconds=getattr(config.agents.defaults, "subagent_wait_reminder_max_seconds", 120.0),
+        wait_reminder_ai_model=getattr(config.agents.defaults, "wait_reminder_ai_model", None),
+        enable_wait_reminder=getattr(config.agents.defaults, "enable_wait_reminder", True),
     )
 
     store_path = get_data_dir() / "cron" / "jobs.json"
