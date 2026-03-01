@@ -41,11 +41,12 @@ async def run_wait_decision(
         sys_content = (
             "You are a wait-state decision agent. The current operation has reached the maximum wait time. "
             "Reply with exactly one line: either WAIT or WAIT N (N = seconds for next check) or SEND: <message>. "
-            "Prefer SEND to inform the user that the operation timed out and suggest pausing or confirming whether to continue."
+            "Prefer SEND to inform the user that the operation timed out and suggest pausing or confirming whether to continue. "
+            "When using SEND, write the message in the same language as the user's task (e.g. use 中文 if the user context is in Chinese)."
         )
         user_content = (
             f"Already waited {int(elapsed_seconds)} seconds; operation: {operation}. "
-            f"{'Task: ' + task_summary if task_summary else ''} "
+            f"{'User task (match this language in SEND): ' + (task_summary or '') if task_summary else ''} "
             "Maximum wait reached. Reply with WAIT or SEND: <your short message to the user>."
         )
     else:
@@ -53,11 +54,12 @@ async def run_wait_decision(
             "You are a wait-state decision agent. Based on how long we have been waiting and the current operation, "
             "reply with exactly one line: WAIT or WAIT N (N = seconds until next check, e.g. WAIT 10) or SEND: <message>. "
             "Use SEND when you want to tell the user something (e.g. still working, possibly slow). "
-            "Message can use Markdown and newlines. Keep it brief."
+            "Message can use Markdown and newlines. Keep it brief. "
+            "When using SEND, write in the same language as the user's task (e.g. use 中文 if the user context is in Chinese)."
         )
         user_content = (
             f"Already waited {int(elapsed_seconds)} seconds. Current operation: {operation}. "
-            + (f"Task context: {task_summary}. " if task_summary else "")
+            + (f"User task (match this language in SEND): {task_summary}. " if task_summary else "")
             + "Reply with only: WAIT or WAIT N or SEND: <message to user>."
         )
 
