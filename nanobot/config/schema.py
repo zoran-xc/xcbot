@@ -217,6 +217,7 @@ class AgentDefaults(Base):
     memory_window: int = 100
     context_compaction_trigger_tokens: int = 38_000
     context_compaction_max_rounds: int = 3
+    interrupt_on_new_message: bool = True  # When True, new message in same session cancels current task and continues with full history
 
 
 class AgentsConfig(Base):

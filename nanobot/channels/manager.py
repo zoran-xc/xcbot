@@ -102,12 +102,12 @@ class ChannelManager:
                     timeout=1.0
                 )
                 
-                # Tool result visibility: skip unless send_tool_results is enabled
+                # Tool result visibility: skip unless send_tool_results is enabled.
+                # Do not re-filter tool_result messages by send_progress (subagent results set both _reply_kind and _progress).
                 if msg.metadata.get("_reply_kind") == "tool_result":
                     if not self.config.channels.send_tool_results:
                         continue
-
-                if msg.metadata.get("_progress"):
+                elif msg.metadata.get("_progress"):
                     if msg.metadata.get("_tool_hint") and not self.config.channels.send_tool_hints:
                         continue
                     if not msg.metadata.get("_tool_hint") and not self.config.channels.send_progress:

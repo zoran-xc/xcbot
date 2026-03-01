@@ -71,10 +71,12 @@ class AgentLoop:
         session_manager: SessionManager | None = None,
         mcp_servers: dict | None = None,
         channels_config: ChannelsConfig | None = None,
+        interrupt_on_new_message: bool = True,
     ):
         from nanobot.config.schema import ExecToolConfig
         self.bus = bus
         self.channels_config = channels_config
+        self._interrupt_on_new_message = interrupt_on_new_message
         self.provider = provider
         self.workspace = workspace
         self.model = model or provider.get_default_model()
@@ -540,9 +542,25 @@ class AgentLoop:
             if msg.content.strip().lower() == "/stop":
                 await self._handle_stop(msg)
             else:
+                if self._interrupt_on_new_message:
+                    await self._cancel_session_tasks(msg.session_key)
                 task = asyncio.create_task(self._dispatch(msg))
                 self._active_tasks.setdefault(msg.session_key, []).append(task)
                 task.add_done_callback(lambda t, k=msg.session_key: self._active_tasks.get(k, []) and self._active_tasks[k].remove(t) if t in self._active_tasks.get(k, []) else None)
+
+    async def _cancel_session_tasks(self, session_key: str) -> None:
+        """Cancel in-flight tasks for this session (used when new message arrives and interrupt_on_new_message is True).
+        Session history is unchanged; the new message will be processed with full history including the interrupted one.
+        """
+        tasks = self._active_tasks.pop(session_key, [])
+        for t in tasks:
+            if not t.done():
+                t.cancel()
+        for t in tasks:
+            try:
+                await t
+            except (asyncio.CancelledError, Exception):
+                pass
 
     async def _handle_stop(self, msg: InboundMessage) -> None:
         """Cancel all active tasks and subagents for the session."""

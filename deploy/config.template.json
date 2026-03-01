@@ -10,7 +10,8 @@
       "maxToolIterations": 40,
       "memoryWindow": 100,
       "contextCompactionTriggerTokens": 38000,
-      "contextCompactionMaxRounds": 3
+      "contextCompactionMaxRounds": 3,
+      "interruptOnNewMessage": true
     }
   },
   "channels": {
