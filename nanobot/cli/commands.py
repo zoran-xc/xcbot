@@ -264,6 +264,7 @@ def gateway(
     from nanobot.cron.service import CronService
     from nanobot.cron.types import CronJob
     from nanobot.heartbeat.service import HeartbeatService
+    from nanobot.idle_consolidation.service import IdleConsolidationService
     
     if verbose:
         import logging
@@ -397,6 +398,19 @@ def gateway(
         interval_s=hb_cfg.interval_s,
         enabled=hb_cfg.enabled,
     )
+
+    idle_cfg = config.gateway.idle_consolidation
+    idle_consolidation = IdleConsolidationService(
+        session_manager=session_manager,
+        workspace=config.workspace_path,
+        provider=provider,
+        model=agent.model,
+        memory_window=config.agents.defaults.memory_window,
+        interval_s=idle_cfg.interval_s,
+        idle_s=idle_cfg.idle_s,
+        enabled=idle_cfg.enabled,
+        is_busy=lambda k: agent._processing_lock.locked() or bool(getattr(agent, "_active_tasks", {}).get(k)),
+    )
     
     if channels.enabled_channels:
         console.print(f"[green]✓[/green] Channels enabled: {', '.join(channels.enabled_channels)}")
@@ -413,6 +427,7 @@ def gateway(
         try:
             await cron.start()
             await heartbeat.start()
+            await idle_consolidation.start()
             await asyncio.gather(
                 agent.run(),
                 channels.start_all(),
@@ -423,6 +438,7 @@ def gateway(
             await agent.close_mcp()
             heartbeat.stop()
             cron.stop()
+            idle_consolidation.stop()
             agent.stop()
             await channels.stop_all()
     

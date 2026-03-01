@@ -240,6 +240,11 @@
   "gateway": {
     "host": "0.0.0.0",
     "port": 18790,
+    "idleConsolidation": {
+      "enabled": true,
+      "intervalS": 60,
+      "idleS": 1800
+    },
     "heartbeat": {
       "enabled": true,
       "intervalS": 1800

@@ -277,12 +277,21 @@ class HeartbeatConfig(Base):
     interval_s: int = 30 * 60  # 30 minutes
 
 
+class IdleConsolidationConfig(Base):
+    """Idle consolidation (auto context/memory maintenance) configuration."""
+
+    enabled: bool = True
+    interval_s: int = 60  # scan interval
+    idle_s: int = 30 * 60  # user inactivity seconds before triggering consolidation
+
+
 class GatewayConfig(Base):
     """Gateway/server configuration."""
 
     host: str = "0.0.0.0"
     port: int = 18790
     heartbeat: HeartbeatConfig = Field(default_factory=HeartbeatConfig)
+    idle_consolidation: IdleConsolidationConfig = Field(default_factory=IdleConsolidationConfig)
 
 
 class WebSearchConfig(Base):
