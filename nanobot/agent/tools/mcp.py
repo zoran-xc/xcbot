@@ -37,6 +37,7 @@ class MCPToolWrapper(Tool):
         tool_timeout: int = 30,
     ):
         self._session = session
+        self._server_name = server_name
         self._original_name = tool_def.name
         self._name = f"mcp_{server_name}_{tool_def.name}"
         self._description = tool_def.description or tool_def.name
@@ -58,27 +59,6 @@ class MCPToolWrapper(Tool):
         return self._parameters
 
     def validate_params(self, params: dict[str, Any]) -> list[str]:
-        try:
-            def _is_uid_key(key: str) -> bool:
-                return key == "uid" or key.endswith("_uid") or key.endswith("Uid") or key.endswith("UID")
-
-            def _coerce(obj: Any) -> Any:
-                if isinstance(obj, dict):
-                    for kk, vv in list(obj.items()):
-                        if isinstance(kk, str) and _is_uid_key(kk) and vv is not None and not isinstance(vv, str):
-                            obj[kk] = str(vv)
-                        else:
-                            obj[kk] = _coerce(vv)
-                    return obj
-                if isinstance(obj, list):
-                    for i, item in enumerate(list(obj)):
-                        obj[i] = _coerce(item)
-                    return obj
-                return obj
-
-            _coerce(params or {})
-        except Exception:
-            pass
         return super().validate_params(params)
 
     async def execute(self, **kwargs: Any) -> str:

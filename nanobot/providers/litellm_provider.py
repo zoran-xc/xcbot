@@ -242,6 +242,13 @@ class LiteLLMProvider(LLMProvider):
         """Parse LiteLLM response into our standard format."""
         choice = response.choices[0]
         message = choice.message
+
+        def _preprocess_tool_args(s: str) -> str:
+            import re
+
+            uid_key = r"(?:uid|[A-Za-z0-9_]*_uid|[A-Za-z0-9_]*Uid|[A-Za-z0-9_]*UID)"
+            pat = re.compile(rf'(\"?{uid_key}\"?\s*:\s*)(\d+_\d+)(?=\s*[,\}}\]])')
+            return pat.sub(r'\1"\2"', s)
         
         tool_calls = []
         if hasattr(message, "tool_calls") and message.tool_calls:
@@ -249,7 +256,27 @@ class LiteLLMProvider(LLMProvider):
                 # Parse arguments from JSON string if needed
                 args = tc.function.arguments
                 if isinstance(args, str):
-                    args = json_repair.loads(args)
+                    pre = _preprocess_tool_args(args)
+                    raw_preview = args if len(args) <= 800 else args[:800] + "..."
+                    pre_preview = pre if len(pre) <= 800 else pre[:800] + "..."
+                    logger.debug(
+                        "Tool args parse (LiteLLMProvider): name={} raw={} pre={}",
+                        tc.function.name,
+                        raw_preview,
+                        pre_preview,
+                    )
+                    args = json_repair.loads(pre)
+                    try:
+                        logger.debug(
+                            "Tool args parsed (LiteLLMProvider): name={} parsed={}",
+                            tc.function.name,
+                            args,
+                        )
+                    except Exception:
+                        logger.debug(
+                            "Tool args parsed (LiteLLMProvider): name={} (failed to stringify)",
+                            tc.function.name,
+                        )
                 
                 tool_calls.append(ToolCallRequest(
                     id=_short_tool_id(),

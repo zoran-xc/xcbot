@@ -1,6 +1,10 @@
 """Tool registry for dynamic tool management."""
 
+import json
+import time
 from typing import Any
+
+from loguru import logger
 
 from nanobot.agent.tools.base import Tool
 
@@ -44,14 +48,36 @@ class ToolRegistry:
             return f"Error: Tool '{name}' not found. Available: {', '.join(self.tool_names)}"
 
         try:
+            start = time.perf_counter()
+
+            try:
+                params_preview = json.dumps(params, ensure_ascii=False, default=str)
+            except Exception:
+                params_preview = str(params)
+            if len(params_preview) > 800:
+                params_preview = params_preview[:800] + "..."
+            logger.info("Tool exec start: name={} params={}", name, params_preview)
+
             errors = tool.validate_params(params)
             if errors:
                 return f"Error: Invalid parameters for tool '{name}': " + "; ".join(errors) + _HINT
             result = await tool.execute(**params)
             if isinstance(result, str) and result.startswith("Error"):
                 return result + _HINT
+
+            took_ms = int((time.perf_counter() - start) * 1000)
+            preview = result
+            if isinstance(preview, str) and len(preview) > 800:
+                preview = preview[:800] + "..."
+            logger.info("Tool exec done: name={} tookMs={} result={}", name, took_ms, preview)
             return result
         except Exception as e:
+            took_ms = None
+            try:
+                took_ms = int((time.perf_counter() - start) * 1000)
+            except Exception:
+                pass
+            logger.exception("Tool exec error: name={} tookMs={} error={}", name, took_ms, e)
             return f"Error executing {name}: {str(e)}" + _HINT
     
     @property

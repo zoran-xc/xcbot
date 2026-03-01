@@ -831,6 +831,17 @@ class AgentLoop:
         key = session_key or msg.session_key
         session = self.sessions.get_or_create(key)
 
+        # Pin the user's current task to session metadata so it survives context trimming.
+        # Keep it lightweight and skip slash commands.
+        try:
+            raw = (msg.content or "").strip()
+            if raw and not raw.startswith("/"):
+                # Avoid pinning ultra-short chatter like "ok"/"继续".
+                if len(raw) >= 12:
+                    session.metadata["pinned_task"] = raw[:800]
+        except Exception:
+            pass
+
         # Slash commands
         cmd = msg.content.strip().lower()
         if cmd == "/new":
@@ -935,6 +946,18 @@ class AgentLoop:
             feishu_recent = meta.get("feishu_recent_context")
             if isinstance(feishu_recent, str) and feishu_recent.strip():
                 extra_system_prompt = feishu_recent.strip()
+
+        # Always inject pinned task (if any) as the highest-priority extra system prompt.
+        try:
+            pinned_task = (session.metadata or {}).get("pinned_task")
+            if isinstance(pinned_task, str) and pinned_task.strip():
+                pinned_block = "## 当前任务（Pinned）\n" + pinned_task.strip()
+                if extra_system_prompt:
+                    extra_system_prompt = pinned_block + "\n\n---\n\n" + extra_system_prompt
+                else:
+                    extra_system_prompt = pinned_block
+        except Exception:
+            pass
 
         msgs = await _build(extra_system_prompt)
         outcome = await self._run_single_attempt(

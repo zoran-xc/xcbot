@@ -924,13 +924,16 @@ class FeishuChannel(BaseChannel):
                         },
                         "elements": elements,
                     }
+                    # Feishu expects `content` to be a JSON string, and for interactive cards
+                    # the `card` field should be a JSON string (not a nested object).
+                    card_json = json.dumps(card, ensure_ascii=False)
                     ok = await loop.run_in_executor(
                         None,
                         self._send_message_sync,
                         receive_id_type,
                         msg.chat_id,
                         "interactive",
-                        json.dumps({"card": card}, ensure_ascii=False),
+                        json.dumps({"card": card_json}, ensure_ascii=False),
                     )
                     if not ok:
                         self._card_disabled = True
@@ -966,16 +969,6 @@ class FeishuChannel(BaseChannel):
     async def _on_message(self, data: "P2ImMessageReceiveV1") -> None:
         """Handle incoming message from Feishu."""
         try:
-            # Log full event body to console for debugging (structure of request/event)
-            try:
-                body = _event_to_loggable(data)
-                logger.info(
-                    "Feishu event full body:\n{}",
-                    json.dumps(body, ensure_ascii=False, indent=2),
-                )
-            except Exception as e:
-                logger.warning("Feishu event body dump failed: {}", e)
-
             event = data.event
             message = event.message
             sender = event.sender

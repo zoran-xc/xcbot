@@ -283,6 +283,20 @@
         "headers": {},
         "toolTimeout": 120
       },
+      "playwright": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@playwright/mcp@latest",
+          "--headless",
+          "--no-sandbox",
+          "--isolated"
+        ],
+        "env": {},
+        "url": "",
+        "headers": {},
+        "toolTimeout": 120
+      },
       "xiaohongshu": {
         "command": "",
         "args": [],

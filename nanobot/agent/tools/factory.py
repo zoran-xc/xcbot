@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
 from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.agent.tools.shell import ExecTool
-from nanobot.agent.tools.web import WebFetchTool, WebSearchTool
+from nanobot.agent.tools.web import WebFetchTool
 
 if TYPE_CHECKING:
     from nanobot.agent.subagent import SubagentManager
@@ -47,7 +47,6 @@ def build_tool_registry(
         )
     )
 
-    tools.register(WebSearchTool(api_key=brave_api_key))
     tools.register(WebFetchTool())
 
     if mode == "main":

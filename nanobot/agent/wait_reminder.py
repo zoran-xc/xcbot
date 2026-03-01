@@ -39,28 +39,29 @@ async def run_wait_decision(
     """
     if is_timeout:
         sys_content = (
-            "You are a wait-state decision agent. The current operation has reached the maximum wait time. "
-            "Reply with exactly one line: either WAIT or WAIT N (N = seconds for next check) or SEND: <message>. "
-            "Prefer SEND to inform the user that the operation timed out and suggest pausing or confirming whether to continue. "
-            "When using SEND, write the message in the same language as the user's task (e.g. use 中文 if the user context is in Chinese)."
+            "你是一个等待状态决策助手。当前操作已经达到最大等待时间。"
+            "你必须只回复一行，并且严格使用以下格式之一："
+            "WAIT  或  WAIT N（N=下次检查等待秒数） 或  SEND: <message>。"
+            "优先使用 SEND，用于告知用户已超时，并建议暂停/稍后重试/确认是否继续。"
+            "当使用 SEND 时，<message> 必须使用中文输出（除非用户任务明确要求其他语言）。"
         )
         user_content = (
-            f"Already waited {int(elapsed_seconds)} seconds; operation: {operation}. "
-            f"{'User task (match this language in SEND): ' + (task_summary or '') if task_summary else ''} "
-            "Maximum wait reached. Reply with WAIT or SEND: <your short message to the user>."
+            f"已等待 {int(elapsed_seconds)} 秒；当前操作：{operation}。"
+            + (f"用户任务摘要（SEND 消息语言应匹配）：{task_summary}。" if task_summary else "")
+            + "已达到最大等待时间。请只回复：WAIT 或 WAIT N 或 SEND: <给用户的简短中文提示>。"
         )
     else:
         sys_content = (
-            "You are a wait-state decision agent. Based on how long we have been waiting and the current operation, "
-            "reply with exactly one line: WAIT or WAIT N (N = seconds until next check, e.g. WAIT 10) or SEND: <message>. "
-            "Use SEND when you want to tell the user something (e.g. still working, possibly slow). "
-            "Message can use Markdown and newlines. Keep it brief. "
-            "When using SEND, write in the same language as the user's task (e.g. use 中文 if the user context is in Chinese)."
+            "你是一个等待状态决策助手。请根据已等待时长与当前操作决定：继续等待，还是向用户发送一条提示。"
+            "你必须只回复一行，并且严格使用以下格式之一："
+            "WAIT  或  WAIT N（例如 WAIT 10，表示 10 秒后再检查） 或  SEND: <message>。"
+            "当你需要告诉用户仍在处理中/可能较慢/正在重试等信息时，使用 SEND。"
+            "当使用 SEND 时，<message> 必须使用中文输出（除非用户任务明确要求其他语言）。"
         )
         user_content = (
-            f"Already waited {int(elapsed_seconds)} seconds. Current operation: {operation}. "
-            + (f"User task (match this language in SEND): {task_summary}. " if task_summary else "")
-            + "Reply with only: WAIT or WAIT N or SEND: <message to user>."
+            f"已等待 {int(elapsed_seconds)} 秒。当前操作：{operation}。"
+            + (f"用户任务摘要（SEND 消息语言应匹配）：{task_summary}。" if task_summary else "")
+            + "请只回复：WAIT 或 WAIT N 或 SEND: <给用户的简短中文提示>。"
         )
 
     messages = [
