@@ -40,10 +40,10 @@
     },
     "feishu": {
       "enabled": true,
-      "appId": "cli_a92911b89bb81cbd",
-      "appSecret": "Xdspal6Ba3ffqj84Qko9FbTE5sgblluC",
-      "encryptKey": "0qTSbe7KjCRzzTdcGzqyfcByhX7fBcvE",
-      "verificationToken": "XFLLlPl4XH1wJdYm2aFodgbS0YKFkwFL",
+      "appId": "cli_a928262209799bd3",
+      "appSecret": "daOKsrgY2evir84WQsiz5fFZlOEaFoYw",
+      "encryptKey": "B9Daf0rzLlFpM32QmlQRqgiwPhcGKp5Z",
+      "verificationToken": "L2LS4DIef2ILm1uqWBBkxdMz1VUifyVA",
       "allowFrom": [],
       "reactEmoji": "Get",
       "useCard": true
