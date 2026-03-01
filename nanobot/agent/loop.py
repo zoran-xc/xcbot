@@ -970,6 +970,63 @@ class AgentLoop:
         tools_used = outcome.tools_used
         all_msgs = outcome.messages
 
+        try:
+            meta = msg.metadata or {}
+            already_retried = meta.get("_auto_recovered_tool_chain_error") is True
+            text = (final_content or "")
+            is_tool_chain_400 = (
+                ("Error code: 400" in text)
+                and ("code': 20015" in text or 'code": 20015' in text)
+                and ("Message has tool role" in text)
+            )
+            if is_tool_chain_400 and not already_retried:
+                lock = self._consolidation_locks.setdefault(session.key, asyncio.Lock())
+                self._consolidating.add(session.key)
+                try:
+                    async with lock:
+                        snapshot = session.messages[session.last_consolidated:]
+                        if snapshot:
+                            temp = Session(key=session.key)
+                            temp.messages = list(snapshot)
+                            ok = await self._consolidate_memory(temp, archive_all=True)
+                            if not ok:
+                                return OutboundMessage(
+                                    channel=msg.channel,
+                                    chat_id=msg.chat_id,
+                                    content=final_content,
+                                    metadata=msg.metadata or {},
+                                )
+                except Exception:
+                    logger.exception("Auto recovery archival failed for {}", session.key)
+                    return OutboundMessage(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        content=final_content,
+                        metadata=msg.metadata or {},
+                    )
+                finally:
+                    self._consolidating.discard(session.key)
+                    if not lock.locked():
+                        self._consolidation_locks.pop(session.key, None)
+
+                session.clear()
+                self.sessions.save(session)
+                self.sessions.invalidate(session.key)
+
+                retry_meta = dict(msg.metadata or {})
+                retry_meta["_auto_recovered_tool_chain_error"] = True
+                retry_msg = InboundMessage(
+                    channel=msg.channel,
+                    sender_id=msg.sender_id,
+                    chat_id=msg.chat_id,
+                    content=msg.content,
+                    media=list(getattr(msg, "media", []) or []),
+                    metadata=retry_meta,
+                )
+                return await self._process_message(retry_msg, session_key=key, on_progress=on_progress)
+        except Exception:
+            logger.exception("Auto recovery failed")
+
         self._try_append_task_anchor(key, final_content)
 
         if final_content is None:
