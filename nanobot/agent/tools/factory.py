@@ -72,6 +72,10 @@ def build_tool_registry(
 
         tools.register(SessionTool(workspace=workspace))
 
+        from nanobot.agent.tools.subagent_tasks import SubagentTasksTool
+
+        tools.register(SubagentTasksTool(manager=subagent_manager, workspace=workspace))
+
         from nanobot.agent.tools.subagent_inspect import SubagentInspectTool
 
         tools.register(SubagentInspectTool(workspace=workspace))

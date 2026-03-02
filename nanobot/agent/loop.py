@@ -15,6 +15,7 @@ from loguru import logger
 from nanobot.agent.context import ContextBuilder
 from nanobot.agent.memory import MemoryStore
 from nanobot.agent.subagent import SubagentManager
+from nanobot.agent.subagent_task_store import SubagentTaskStore
 from nanobot.agent.wait_reminder import WaitReminderTimeout, run_with_ai_wait_reminder as wait_reminder_run
 from nanobot.agent.plan_header import PLAN_RULES, parse_plan_header
 from nanobot.agent.task_anchor import TaskAnchorEntry, TaskAnchorStore
@@ -137,6 +138,9 @@ class AgentLoop:
             trace_enabled=subagent_trace_enabled,
             trace_dir=subagent_trace_dir,
             trace_max_chars=subagent_trace_max_chars,
+            memory_window=self.memory_window,
+            context_compaction_trigger_tokens=self.context_compaction_trigger_tokens,
+            context_compaction_max_rounds=self.context_compaction_max_rounds,
         )
 
         self._running = False
@@ -399,6 +403,71 @@ class AgentLoop:
         t = re.sub(r"\[image:\s*[^\]]+\]", "", t).strip()
         t = re.sub(r"\s+", " ", t).strip()
         return not t
+
+    @staticmethod
+    def _looks_like_progress_query(text: str | None) -> bool:
+        if not text:
+            return False
+        t = (text or "").strip().lower()
+        if not t:
+            return False
+        patterns = (
+            "进度",
+            "状态",
+            "子任务",
+            "子任务怎么样",
+            "后台",
+            "跑到哪",
+            "跑到哪里",
+            "完成了吗",
+            "做完了吗",
+            "进行到",
+            "卡住",
+            "卡在哪",
+            "task status",
+            "progress",
+            "status",
+            "subagent",
+            "background",
+        )
+        return any(p in t for p in patterns)
+
+    def _build_subagent_progress_context(self, *, session_key: str, limit: int = 6) -> str | None:
+        try:
+            store = SubagentTaskStore(self.workspace)
+            tasks = store.list(session_key=session_key, limit=limit)
+            if not tasks:
+                return None
+
+            trace_dir = self.workspace / (getattr(self.subagents, "trace_dir", None) or "subagents")
+
+            lines: list[str] = []
+            for t in tasks:
+                base = f"- task_id={t.task_id} | status={t.status} | label={t.label} | updated_at={t.updated_at}"
+                if t.last_summary:
+                    base += f"\n  last_summary: {t.last_summary}"
+                if t.status == "RUNNING":
+                    p = trace_dir / f"{t.task_id}.jsonl"
+                    try:
+                        if p.exists():
+                            raw = p.read_text(encoding="utf-8").splitlines()
+                            tail = raw[-20:]
+                            if tail:
+                                joined = "\n".join(tail)
+                                if len(joined) > 1800:
+                                    joined = joined[-1800:]
+                                base += "\n  trace_tail:\n" + "\n".join("    " + x for x in joined.splitlines())
+                    except Exception:
+                        pass
+                lines.append(base)
+
+            return (
+                "## 子任务进展（仅供你转述给用户，不要直接粘贴 JSONL 日志）\n"
+                + "以下是当前会话下最近的子任务状态与最新片段：\n"
+                + "\n".join(lines)
+            )
+        except Exception:
+            return None
 
     async def _run_agent_loop(
         self,
@@ -928,6 +997,19 @@ class AgentLoop:
             )
 
         async def _bus_progress(content: str, *, tool_hint: bool = False, **kwargs: Any) -> None:
+            cfg = self.channels_config
+            send_progress = bool(getattr(cfg, "send_progress", True)) if cfg is not None else True
+            send_tool_hints = bool(getattr(cfg, "send_tool_hints", False)) if cfg is not None else False
+            send_tool_results = bool(getattr(cfg, "send_tool_results", False)) if cfg is not None else False
+
+            reply_kind = kwargs.get("reply_kind")
+            if tool_hint and not send_tool_hints:
+                return
+            if reply_kind == "tool_result" and not send_tool_results:
+                return
+            if (not tool_hint) and reply_kind != "tool_result" and not send_progress:
+                return
+
             meta = dict(msg.metadata or {})
             meta["_progress"] = True
             meta["_tool_hint"] = tool_hint
@@ -958,6 +1040,14 @@ class AgentLoop:
                     extra_system_prompt = pinned_block
         except Exception:
             pass
+
+        if self._looks_like_progress_query(msg.content):
+            progress_ctx = self._build_subagent_progress_context(session_key=key)
+            if progress_ctx:
+                if extra_system_prompt:
+                    extra_system_prompt = progress_ctx + "\n\n---\n\n" + extra_system_prompt
+                else:
+                    extra_system_prompt = progress_ctx
 
         msgs = await _build(extra_system_prompt)
         outcome = await self._run_single_attempt(

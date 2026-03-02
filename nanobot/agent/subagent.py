@@ -9,11 +9,11 @@ from typing import Any
 
 from loguru import logger
 
-from nanobot.bus.events import InboundMessage, OutboundMessage
+from nanobot.bus.events import InboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.providers.base import LLMProvider
+from nanobot.agent.subagent_task_store import SubagentTaskStore
 from nanobot.agent.tools.factory import build_tool_registry
-from nanobot.agent.wait_reminder import run_with_ai_wait_reminder, WaitReminderTimeout
 
 
 class SubagentManager:
@@ -39,6 +39,9 @@ class SubagentManager:
         trace_enabled: bool = True,
         trace_dir: str = "subagents",
         trace_max_chars: int = 8000,
+        memory_window: int = 100,
+        context_compaction_trigger_tokens: int = 38_000,
+        context_compaction_max_rounds: int = 3,
     ):
         from nanobot.config.schema import ExecToolConfig
         self.provider = provider
@@ -58,11 +61,37 @@ class SubagentManager:
         self.trace_enabled = trace_enabled
         self.trace_dir = trace_dir
         self.trace_max_chars = int(trace_max_chars)
+        self.memory_window = int(memory_window)
+        self.context_compaction_trigger_tokens = int(context_compaction_trigger_tokens)
+        self.context_compaction_max_rounds = int(context_compaction_max_rounds)
         self._running_tasks: dict[str, asyncio.Task[None]] = {}
         self._session_tasks: dict[str, set[str]] = {}  # session_key -> {task_id, ...}
+        self._cancel_reasons: dict[str, str] = {}
+        self._store = SubagentTaskStore(workspace)
 
     def _trace_path(self, task_id: str) -> Path:
         return self.workspace / self.trace_dir / f"{task_id}.jsonl"
+
+    def _checkpoint_dir(self, task_id: str) -> Path:
+        return self.workspace / "state" / "subagents" / task_id
+
+    def _checkpoint_path(self, task_id: str) -> Path:
+        return self._checkpoint_dir(task_id) / "checkpoint.json"
+
+    def _write_checkpoint(self, task_id: str, payload: dict[str, Any]) -> str:
+        path = self._checkpoint_path(task_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return str(path)
+
+    def _read_checkpoint(self, task_id: str) -> dict[str, Any] | None:
+        path = self._checkpoint_path(task_id)
+        if not path.exists():
+            return None
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
 
     def _truncate(self, text: str | None) -> str:
         if not text:
@@ -103,6 +132,15 @@ class SubagentManager:
         display_label = label or task[:30] + ("..." if len(task) > 30 else "")
         origin = {"channel": origin_channel, "chat_id": origin_chat_id}
 
+        self._store.create(
+            task_id=task_id,
+            session_key=session_key,
+            label=display_label,
+            task=task,
+            origin_channel=origin_channel,
+            origin_chat_id=origin_chat_id,
+        )
+
         self._trace(
             task_id,
             "spawn",
@@ -115,7 +153,7 @@ class SubagentManager:
         )
 
         bg_task = asyncio.create_task(
-            self._run_subagent(task_id, task, display_label, origin)
+            self._run_subagent(task_id, task, display_label, origin, initial_messages=None)
         )
         self._running_tasks[task_id] = bg_task
         if session_key:
@@ -139,6 +177,7 @@ class SubagentManager:
         task: str,
         label: str,
         origin: dict[str, str],
+        initial_messages: list[dict[str, Any]] | None,
     ) -> None:
         """Execute the subagent task and announce the result."""
         logger.info("Subagent [{}] starting task: {}", task_id, label)
@@ -164,20 +203,48 @@ class SubagentManager:
                 brave_api_key=self.brave_api_key,
             )
             
-            # Build messages with subagent-specific prompt
-            system_prompt = self._build_subagent_prompt(task)
-            messages: list[dict[str, Any]] = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": task},
-            ]
+            if initial_messages is not None:
+                messages = initial_messages
+            else:
+                system_prompt = self._build_subagent_prompt(task)
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": task},
+                ]
             
             # Run agent loop (limited iterations)
             max_iterations = 15
             iteration = 0
             final_result: str | None = None
+
+            cp_path = self._write_checkpoint(
+                task_id,
+                {
+                    "task_id": task_id,
+                    "label": label,
+                    "task": task,
+                    "iteration": iteration,
+                    "messages": messages,
+                },
+            )
+            self._store.update(task_id, checkpoint_path=cp_path)
             
             while iteration < max_iterations:
                 iteration += 1
+
+                messages = await self._compact_messages_if_needed(messages)
+
+                cp_path = self._write_checkpoint(
+                    task_id,
+                    {
+                        "task_id": task_id,
+                        "label": label,
+                        "task": task,
+                        "iteration": iteration,
+                        "messages": messages,
+                    },
+                )
+                self._store.update(task_id, checkpoint_path=cp_path)
 
                 self._trace(
                     task_id,
@@ -188,41 +255,13 @@ class SubagentManager:
                     },
                 )
 
-                if self.enable_wait_reminder and origin.get("channel") and origin.get("chat_id"):
-                    try:
-                        response = await run_with_ai_wait_reminder(
-                            self.provider,
-                            self.bus,
-                            self.provider.chat(
-                                messages=messages,
-                                tools=tools.get_definitions(),
-                                model=self.model,
-                                temperature=self.temperature,
-                                max_tokens=self.max_tokens,
-                            ),
-                            channel=origin["channel"],
-                            chat_id=origin["chat_id"],
-                            operation="LLM",
-                            task_summary=task[:200] + "…" if len(task) > 200 else task,
-                            pre_wait_seconds=self.pre_wait_seconds,
-                            wait_reminder_interval_seconds=self.wait_reminder_interval_seconds,
-                            wait_reminder_max_seconds=self.subagent_wait_reminder_max_seconds,
-                            wait_reminder_ai_model=self.wait_reminder_ai_model,
-                            main_model=self.model,
-                        )
-                    except WaitReminderTimeout as e:
-                        error_msg = f"Subagent timed out after {int(e.elapsed_seconds)} seconds"
-                        logger.warning("Subagent [{}] {}", task_id, error_msg)
-                        await self._announce_result(task_id, label, task, error_msg, origin, "error")
-                        return
-                else:
-                    response = await self.provider.chat(
-                        messages=messages,
-                        tools=tools.get_definitions(),
-                        model=self.model,
-                        temperature=self.temperature,
-                        max_tokens=self.max_tokens,
-                    )
+                response = await self.provider.chat(
+                    messages=messages,
+                    tools=tools.get_definitions(),
+                    model=self.model,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                )
 
                 if response.has_tool_calls:
                     # Add assistant message with tool calls
@@ -268,27 +307,7 @@ class SubagentManager:
                                 "arguments": self._truncate(args_str),
                             },
                         )
-                        if self.enable_wait_reminder and origin.get("channel") and origin.get("chat_id"):
-                            try:
-                                result = await run_with_ai_wait_reminder(
-                                    self.provider,
-                                    self.bus,
-                                    tools.execute(tool_call.name, tool_call.arguments),
-                                    channel=origin["channel"],
-                                    chat_id=origin["chat_id"],
-                                    operation=f"tool: {tool_call.name}",
-                                    task_summary=tool_call.name,
-                                    pre_wait_seconds=self.pre_wait_seconds,
-                                    wait_reminder_interval_seconds=self.wait_reminder_interval_seconds,
-                                    wait_reminder_max_seconds=self.subagent_wait_reminder_max_seconds,
-                                    wait_reminder_ai_model=self.wait_reminder_ai_model,
-                                    main_model=self.model,
-                                )
-                            except WaitReminderTimeout as e:
-                                result = f"Error: operation timed out after {int(e.elapsed_seconds)} seconds"
-                                logger.warning("Subagent [{}] tool {} timeout", task_id, tool_call.name)
-                        else:
-                            result = await tools.execute(tool_call.name, tool_call.arguments)
+                        result = await tools.execute(tool_call.name, tool_call.arguments)
                         result_str = result if isinstance(result, str) else str(result)
                         messages.append({
                             "role": "tool",
@@ -305,27 +324,6 @@ class SubagentManager:
                                 "tool_name": tool_call.name,
                                 "result": self._truncate(result_str),
                             },
-                        )
-                        # Emit tool result to bus for execution visibility (e.g. Feishu when send_tool_results is on)
-                        display = (
-                            result_str
-                            if len(result_str) <= _tool_result_max_chars
-                            else result_str[:_tool_result_max_chars] + "\n... (truncated)"
-                        )
-                        await self.bus.publish_outbound(
-                            OutboundMessage(
-                                channel=origin["channel"],
-                                chat_id=origin["chat_id"],
-                                content=f"【子任务 {label}】{tool_call.name}: {display}",
-                                metadata={
-                                    "_reply_kind": "tool_result",
-                                    "_tool_name": tool_call.name,
-                                    "_tool_result": display,
-                                    "_origin": "subagent",
-                                    "_task_id": task_id,
-                                    "_progress": True,
-                                },
-                            )
                         )
                 else:
                     final_result = response.content
@@ -351,8 +349,38 @@ class SubagentManager:
                     "result": self._truncate(final_result),
                 },
             )
+            cp_path = self._write_checkpoint(
+                task_id,
+                {
+                    "task_id": task_id,
+                    "label": label,
+                    "task": task,
+                    "iteration": iteration,
+                    "messages": messages,
+                    "final": final_result,
+                },
+            )
+            self._store.update(task_id, status="SUCCEEDED", checkpoint_path=cp_path, last_summary=self._truncate(final_result))
             await self._announce_result(task_id, label, task, final_result, origin, "ok")
             
+        except asyncio.CancelledError:
+            reason = self._cancel_reasons.get(task_id) or "cancel"
+            status = "PAUSED" if reason == "pause" else "CANCELED"
+            try:
+                cp_path = self._write_checkpoint(
+                    task_id,
+                    {
+                        "task_id": task_id,
+                        "label": label,
+                        "task": task,
+                        "iteration": iteration,
+                        "messages": messages,
+                    },
+                )
+                self._store.update(task_id, status=status, checkpoint_path=cp_path)
+            except Exception:
+                self._store.update(task_id, status=status)
+            raise
         except Exception as e:
             error_msg = f"Error: {str(e)}"
             logger.error("Subagent [{}] failed: {}", task_id, e)
@@ -364,6 +392,18 @@ class SubagentManager:
                     "error": self._truncate(error_msg),
                 },
             )
+            cp_path = self._write_checkpoint(
+                task_id,
+                {
+                    "task_id": task_id,
+                    "label": label,
+                    "task": task,
+                    "iteration": iteration,
+                    "messages": messages,
+                    "error": error_msg,
+                },
+            )
+            self._store.update(task_id, status="FAILED", checkpoint_path=cp_path, error=error_msg)
             await self._announce_result(task_id, label, task, error_msg, origin, "error")
     
     async def _announce_result(
@@ -440,10 +480,105 @@ When you have completed the task, provide a clear summary of your findings or ac
         tasks = [self._running_tasks[tid] for tid in self._session_tasks.get(session_key, [])
                  if tid in self._running_tasks and not self._running_tasks[tid].done()]
         for t in tasks:
+            for tid, rt in list(self._running_tasks.items()):
+                if rt is t:
+                    self._cancel_reasons[tid] = "cancel"
             t.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         return len(tasks)
+
+    async def cancel(self, task_id: str) -> bool:
+        t = self._running_tasks.get(task_id)
+        if not t or t.done():
+            self._store.update(task_id, status="CANCELED")
+            return False
+        self._cancel_reasons[task_id] = "cancel"
+        t.cancel()
+        await asyncio.gather(t, return_exceptions=True)
+        self._store.update(task_id, status="CANCELED")
+        return True
+
+    async def pause(self, task_id: str) -> bool:
+        t = self._running_tasks.get(task_id)
+        if not t or t.done():
+            self._store.update(task_id, status="PAUSED")
+            return False
+        self._cancel_reasons[task_id] = "pause"
+        t.cancel()
+        await asyncio.gather(t, return_exceptions=True)
+        self._store.update(task_id, status="PAUSED")
+        return True
+
+    async def resume(
+        self,
+        task_id: str,
+        *,
+        instruction: str | None = None,
+    ) -> str:
+        rec = self._store.get(task_id)
+        if not rec:
+            return f"Error: task not found (task_id={task_id})"
+
+        cp = self._read_checkpoint(task_id)
+        messages = None
+        if cp and isinstance(cp.get("messages"), list):
+            messages = cp.get("messages")
+
+        if messages is None:
+            return f"Error: checkpoint not found for task_id={task_id}"
+
+        if instruction:
+            messages = list(messages) + [{"role": "user", "content": instruction}]
+
+        label = rec.label
+        task = rec.task
+        origin = {"channel": rec.origin_channel or "cli", "chat_id": rec.origin_chat_id or "direct"}
+        self._store.update(task_id, status="RUNNING")
+        bg_task = asyncio.create_task(
+            self._run_subagent(task_id, task, label, origin, initial_messages=messages)
+        )
+        self._running_tasks[task_id] = bg_task
+        return f"Resumed subagent [{label}] (task_id={task_id})."
+
+    async def _compact_messages_if_needed(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if self.context_compaction_trigger_tokens <= 0:
+            return messages
+
+        def _estimate(ms: list[dict[str, Any]]) -> int:
+            total_chars = 0
+            for m in ms:
+                total_chars += len(str(m.get("content") or "")) + 40
+            return max(1, total_chars // 4)
+
+        for _round in range(max(0, self.context_compaction_max_rounds)):
+            if _estimate(messages) <= self.context_compaction_trigger_tokens:
+                return messages
+
+            keep = max(10, int(self.memory_window) // 2)
+            head = messages[:-keep]
+            tail = messages[-keep:]
+            if len(head) < 2:
+                return messages
+
+            prompt = "\n".join(
+                f"[{m.get('role', '')}] {str(m.get('content', ''))}" for m in head if m.get("content")
+            )
+
+            resp = await self.provider.chat(
+                messages=[
+                    {"role": "system", "content": "You summarize conversation context for continuation. Be concise."},
+                    {"role": "user", "content": prompt},
+                ],
+                tools=[],
+                model=self.model,
+                temperature=0.2,
+                max_tokens=512,
+            )
+            summary = (resp.content or "").strip() or "(summary unavailable)"
+            messages = [{"role": "system", "content": "[Subagent context summary]\n" + summary}] + tail
+
+        return messages
 
     def get_running_count(self) -> int:
         """Return the number of currently running subagents."""
