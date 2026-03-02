@@ -1,5 +1,0 @@
-{"_type": "metadata", "key": "feishu:oc_fdd486a667fac73a6b3a63f4e518af56", "created_at": "2026-03-01T06:08:25.560146", "updated_at": "2026-03-01T06:14:40.063756", "metadata": {}, "last_consolidated": 0}
-{"role": "user", "content": "@_user_1 你好", "timestamp": "2026-03-01T06:08:32.501418"}
-{"role": "assistant", "content": "你好呀！有什么我可以帮你的吗喵～ 🐾", "timestamp": "2026-03-01T06:08:32.501425"}
-{"role": "user", "content": "没什么", "timestamp": "2026-03-01T06:14:40.063747"}
-{"role": "user", "content": "[System: 该操作已等待 60 秒超时。请用一两句话向用户说明情况，并建议是否重试或换一种方式。直接回复给用户，不要调用工具。]", "timestamp": "2026-03-01T06:14:40.063754"}
