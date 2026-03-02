@@ -255,9 +255,7 @@ Before deploying xcbot:
 
 **Last Updated**: 2026-02-03
 
-For the latest security updates and announcements, check:
-- GitHub Security Advisories: https://github.com/HKUDS/xcbot/security/advisories
-- Release Notes: https://github.com/HKUDS/xcbot/releases
+For the latest security updates and announcements for your deployment, check your own project’s release notes, changelog, or security advisory channels.
 
 ## License
 

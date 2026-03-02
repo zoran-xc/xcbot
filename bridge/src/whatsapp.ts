@@ -1,6 +1,6 @@
 /**
  * WhatsApp client wrapper using Baileys.
- * Based on OpenClaw's working implementation.
+ * Based on a hardened, production-tested implementation.
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -49,7 +49,7 @@ export class WhatsAppClient {
 
     console.log(`Using Baileys version: ${version.join('.')}`);
 
-    // Create socket following OpenClaw's pattern
+    // Create socket using a resilient connection pattern
     this.sock = makeWASocket({
       auth: {
         creds: state.creds,

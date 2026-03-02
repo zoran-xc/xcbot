@@ -167,10 +167,10 @@ class SkillsLoader:
         return content
     
     def _parse_xcbot_metadata(self, raw: str) -> dict:
-        """Parse skill metadata JSON from frontmatter (supports xcbot and openclaw keys)."""
+        """Parse skill metadata JSON from frontmatter."""
         try:
             data = json.loads(raw)
-            return data.get("xcbot", data.get("openclaw", {})) if isinstance(data, dict) else {}
+            return data.get("xcbot", {}) if isinstance(data, dict) else {}
         except (json.JSONDecodeError, TypeError):
             return {}
     

@@ -12,39 +12,39 @@
   </p>
 </div>
 
-🐈 **xcbot** is an **ultra-lightweight** personal AI assistant inspired by [OpenClaw](https://github.com/openclaw/openclaw) 
+🐈 **xcbot** is an **ultra-lightweight** personal AI assistant framework.
 
-⚡️ Delivers core agent functionality in just **~4,000** lines of code — **99% smaller** than Clawdbot's 430k+ lines.
+⚡️ Delivers core agent functionality in just **~4,000** lines of code.
 
 📏 Real-time line count: **3,922 lines** (run `bash core_agent_lines.sh` to verify anytime)
 
 ## 📢 News
 
-- **2026-02-24** 🚀 Released **v0.1.4.post2** — a reliability-focused release with a redesigned heartbeat, prompt cache optimization, and hardened provider & channel stability. See [release notes](https://github.com/HKUDS/xcbot/releases/tag/v0.1.4.post2) for details.
+- **2026-02-24** 🚀 Released **v0.1.4.post2** — a reliability-focused release with a redesigned heartbeat, prompt cache optimization, and hardened provider & channel stability.
 - **2026-02-23** 🔧 Virtual tool-call heartbeat, prompt cache optimization, Slack mrkdwn fixes.
 - **2026-02-22** 🛡️ Slack thread isolation, Discord typing fix, agent reliability improvements.
-- **2026-02-21** 🎉 Released **v0.1.4.post1** — new providers, media support across channels, and major stability improvements. See [release notes](https://github.com/HKUDS/xcbot/releases/tag/v0.1.4.post1) for details.
+- **2026-02-21** 🎉 Released **v0.1.4.post1** — new providers, media support across channels, and major stability improvements.
 - **2026-02-20** 🐦 Feishu now receives multimodal files from users. More reliable memory under the hood.
 - **2026-02-19** ✨ Slack now sends files, Discord splits long messages, and subagents work in CLI mode.
 - **2026-02-18** ⚡️ xcbot now supports VolcEngine, MCP custom auth headers, and Anthropic prompt caching.
-- **2026-02-17** 🎉 Released **v0.1.4** — MCP support, progress streaming, new providers, and multiple channel improvements. Please see [release notes](https://github.com/HKUDS/xcbot/releases/tag/v0.1.4) for details.
-- **2026-02-16** 🦞 xcbot now integrates a [ClawHub](https://clawhub.ai) skill — search and install public agent skills.
+- **2026-02-17** 🎉 Released **v0.1.4** — MCP support, progress streaming, new providers, and multiple channel improvements.
+- **2026-02-16** 🦞 xcbot now integrates a public skill registry — search and install public agent skills.
 - **2026-02-15** 🔑 xcbot now supports OpenAI Codex provider with OAuth login support.
 - **2026-02-14** 🔌 xcbot now supports MCP! See [MCP section](#mcp-model-context-protocol) for details.
-- **2026-02-13** 🎉 Released **v0.1.3.post7** — includes security hardening and multiple improvements. **Please upgrade to the latest version to address security issues**. See [release notes](https://github.com/HKUDS/xcbot/releases/tag/v0.1.3.post7) for more details.
-- **2026-02-12** 🧠 Redesigned memory system — Less code, more reliable. Join the [discussion](https://github.com/HKUDS/xcbot/discussions/566) about it!
+- **2026-02-13** 🎉 Released **v0.1.3.post7** — includes security hardening and multiple improvements. **Please upgrade to the latest version to address security issues**.
+- **2026-02-12** 🧠 Redesigned memory system — Less code, more reliable.
 - **2026-02-11** ✨ Enhanced CLI experience and added MiniMax support!
 
 <details>
 <summary>Earlier news</summary>
 
-- **2026-02-10** 🎉 Released **v0.1.3.post6** with improvements! Check the updates [notes](https://github.com/HKUDS/xcbot/releases/tag/v0.1.3.post6) and our [roadmap](https://github.com/HKUDS/xcbot/discussions/431).
+- **2026-02-10** 🎉 Released **v0.1.3.post6** with improvements and roadmap updates.
 - **2026-02-09** 💬 Added Slack, Email, and QQ support — xcbot now supports multiple chat platforms!
 - **2026-02-08** 🔧 Refactored Providers—adding a new LLM provider now takes just 2 simple steps! Check [here](#providers).
-- **2026-02-07** 🚀 Released **v0.1.3.post5** with Qwen support & several key improvements! Check [here](https://github.com/HKUDS/xcbot/releases/tag/v0.1.3.post5) for details.
+- **2026-02-07** 🚀 Released **v0.1.3.post5** with Qwen support & several key improvements.
 - **2026-02-06** ✨ Added Moonshot/Kimi provider, Discord integration, and enhanced security hardening!
 - **2026-02-05** ✨ Added Feishu channel, DeepSeek provider, and enhanced scheduled tasks support!
-- **2026-02-04** 🚀 Released **v0.1.3.post4** with multi-provider & Docker support! Check [here](https://github.com/HKUDS/xcbot/releases/tag/v0.1.3.post4) for details.
+- **2026-02-04** 🚀 Released **v0.1.3.post4** with multi-provider & Docker support.
 - **2026-02-03** ⚡ Integrated vLLM for local LLM support and improved natural language task scheduling!
 - **2026-02-02** 🎉 xcbot officially launched! Welcome to try 🐈 xcbot!
 
@@ -52,7 +52,7 @@
 
 ## Key Features of xcbot:
 
-🪶 **Ultra-Lightweight**: Just ~4,000 lines of core agent code — 99% smaller than Clawdbot.
+🪶 **Ultra-Lightweight**: Just ~4,000 lines of core agent code.
 
 🔬 **Research-Ready**: Clean, readable code that's easy to understand, modify, and extend for research.
 
@@ -94,7 +94,7 @@
 **Install from source** (latest features, recommended for development)
 
 ```bash
-git clone https://github.com/HKUDS/xcbot.git
+git clone <your-repo-url>.git
 cd xcbot
 pip install -e .
 ```
@@ -215,11 +215,7 @@ Uses **Socket.IO WebSocket** by default, with HTTP polling fallback.
 
 **1. Ask xcbot to set up Mochat for you**
 
-Simply send this message to xcbot (replace `xxx@xxx` with your real email):
-
-```
-Read https://raw.githubusercontent.com/HKUDS/MoChat/refs/heads/main/skills/xcbot/skill.md and register on MoChat. My Email account is xxx@xxx Bind me as your owner and DM me on MoChat.
-```
+Simply send the onboarding message provided by your MoChat integration guide (replace `xxx@xxx` with your real email).
 
 xcbot will automatically register, configure `~/.xcbot/config.json`, and connect to Mochat.
 
@@ -1073,38 +1069,13 @@ xcbot/
 
 PRs welcome! The codebase is intentionally small and readable. 🤗
 
-**Roadmap** — Pick an item and [open a PR](https://github.com/HKUDS/xcbot/pulls)!
+**Roadmap** — Pick an item and open a PR in your xcbot repository!
 
 - [ ] **Multi-modal** — See and hear (images, voice, video)
 - [ ] **Long-term memory** — Never forget important context
 - [ ] **Better reasoning** — Multi-step planning and reflection
 - [ ] **More integrations** — Calendar and more
 - [ ] **Self-improvement** — Learn from feedback and mistakes
-
-### Contributors
-
-<a href="https://github.com/HKUDS/xcbot/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=HKUDS/xcbot&max=100&columns=12&updated=20260210" alt="Contributors" />
-</a>
-
-
-## ⭐ Star History
-
-<div align="center">
-  <a href="https://star-history.com/#HKUDS/xcbot&Date">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=HKUDS/xcbot&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=HKUDS/xcbot&type=Date" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=HKUDS/xcbot&type=Date" style="border-radius: 15px; box-shadow: 0 0 30px rgba(0, 217, 255, 0.3);" />
-    </picture>
-  </a>
-</div>
-
-<p align="center">
-  <em> Thanks for visiting ✨ xcbot!</em><br><br>
-  <img src="https://visitor-badge.laobi.icu/badge?page_id=HKUDS.xcbot&style=for-the-badge&color=00d4ff" alt="Views">
-</p>
-
 
 <p align="center">
   <sub>xcbot is for educational, research, and technical exchange purposes only</sub>
