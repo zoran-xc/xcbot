@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING, Any, Awaitable
 from loguru import logger
 
 if TYPE_CHECKING:
-    from nanobot.bus.queue import MessageBus
-    from nanobot.providers.base import LLMProvider
+    from xcbot.bus.queue import MessageBus
+    from xcbot.providers.base import LLMProvider
 
 
 class WaitReminderTimeout(Exception):
@@ -123,7 +123,7 @@ async def run_with_ai_wait_reminder(
     Raises WaitReminderTimeout when wait_reminder_max_seconds > 0 and elapsed >= it.
     Caller should not invoke this when the feature is disabled.
     """
-    from nanobot.bus.events import OutboundMessage
+    from xcbot.bus.events import OutboundMessage
 
     if pre_wait_seconds > 0:
         await asyncio.sleep(pre_wait_seconds)

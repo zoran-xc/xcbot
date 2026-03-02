@@ -7,11 +7,11 @@ from typing import Any
 
 from loguru import logger
 
-from nanobot.bus.events import OutboundMessage
-from nanobot.bus.queue import MessageBus
-from nanobot.channels.base import BaseChannel
-from nanobot.channels.registry import CHANNEL_SPECS
-from nanobot.config.schema import Config
+from xcbot.bus.events import OutboundMessage
+from xcbot.bus.queue import MessageBus
+from xcbot.channels.base import BaseChannel
+from xcbot.channels.registry import CHANNEL_SPECS
+from xcbot.config.schema import Config
 
 
 class ChannelManager:

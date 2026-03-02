@@ -9,11 +9,11 @@ from typing import Any
 
 from loguru import logger
 
-from nanobot.bus.events import InboundMessage
-from nanobot.bus.queue import MessageBus
-from nanobot.providers.base import LLMProvider
-from nanobot.agent.subagent_task_store import SubagentTaskStore
-from nanobot.agent.tools.factory import build_tool_registry
+from xcbot.bus.events import InboundMessage
+from xcbot.bus.queue import MessageBus
+from xcbot.providers.base import LLMProvider
+from xcbot.agent.subagent_task_store import SubagentTaskStore
+from xcbot.agent.tools.factory import build_tool_registry
 
 
 class SubagentManager:
@@ -43,7 +43,7 @@ class SubagentManager:
         context_compaction_trigger_tokens: int = 38_000,
         context_compaction_max_rounds: int = 3,
     ):
-        from nanobot.config.schema import ExecToolConfig
+        from xcbot.config.schema import ExecToolConfig
         self.provider = provider
         self.workspace = workspace
         self.bus = bus

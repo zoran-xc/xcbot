@@ -8,7 +8,7 @@ import json_repair
 from loguru import logger
 from openai import AsyncOpenAI
 
-from nanobot.providers.base import LLMProvider, LLMResponse, ToolCallRequest
+from xcbot.providers.base import LLMProvider, LLMResponse, ToolCallRequest
 
 
 class CustomProvider(LLMProvider):

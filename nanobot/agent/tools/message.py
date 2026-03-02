@@ -3,8 +3,8 @@
 import re
 from typing import Any, Awaitable, Callable
 
-from nanobot.agent.tools.base import Tool
-from nanobot.bus.events import OutboundMessage
+from xcbot.agent.tools.base import Tool
+from xcbot.bus.events import OutboundMessage
 
 
 class MessageTool(Tool):

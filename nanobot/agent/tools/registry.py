@@ -6,7 +6,7 @@ from typing import Any
 
 from loguru import logger
 
-from nanobot.agent.tools.base import Tool
+from xcbot.agent.tools.base import Tool
 
 
 class ToolRegistry:

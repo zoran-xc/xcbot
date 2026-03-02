@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
-from nanobot.agent.memory import MemoryStore
+from xcbot.agent.memory import MemoryStore
 
 if TYPE_CHECKING:
-    from nanobot.providers.base import LLMProvider
-    from nanobot.session.manager import SessionManager
+    from xcbot.providers.base import LLMProvider
+    from xcbot.session.manager import SessionManager
 
 
 class IdleConsolidationService:

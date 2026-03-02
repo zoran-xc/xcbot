@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from nanobot.agent.tools.base import Tool
+from xcbot.agent.tools.base import Tool
 
 
 def _trace_dir(workspace: Path, trace_dir: str) -> Path:

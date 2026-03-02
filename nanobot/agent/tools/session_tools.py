@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from nanobot.agent.tools.base import Tool
-from nanobot.utils.helpers import safe_filename
+from xcbot.agent.tools.base import Tool
+from xcbot.utils.helpers import safe_filename
 
 
 def _sessions_dir(workspace: Path) -> Path:

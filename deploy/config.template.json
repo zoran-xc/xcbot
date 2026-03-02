@@ -1,7 +1,7 @@
 {
   "agents": {
     "defaults": {
-      "workspace": "~/.nanobot/workspace",
+      "workspace": "~/.xcbot/workspace",
       "model": "Pro/MiniMaxAI/MiniMax-M2.5",
       "visionModel": "Qwen/Qwen3-VL-32B-Instruct",
       "provider": "siliconflow",

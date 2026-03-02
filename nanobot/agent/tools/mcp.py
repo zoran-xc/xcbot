@@ -1,4 +1,4 @@
-"""MCP client: connects to MCP servers and wraps their tools as native nanobot tools."""
+"""MCP client: connects to MCP servers and wraps their tools as native xcbot tools."""
 
 import asyncio
 import re
@@ -9,14 +9,14 @@ from typing import Any
 import httpx
 from loguru import logger
 
-from nanobot.agent.tools.base import Tool
-from nanobot.agent.tools.registry import ToolRegistry
-from nanobot.utils.helpers import timestamp
-from nanobot.utils.media_cache import MediaCache
+from xcbot.agent.tools.base import Tool
+from xcbot.agent.tools.registry import ToolRegistry
+from xcbot.utils.helpers import timestamp
+from xcbot.utils.media_cache import MediaCache
 
 
 class MCPToolWrapper(Tool):
-    """Wraps a single MCP server tool as a nanobot Tool."""
+    """Wraps a single MCP server tool as a xcbot Tool."""
 
     _IMAGE_RE = re.compile(
         r"type=['\"]image['\"]\s+data=['\"](?P<data>[A-Za-z0-9+/=\r\n]+)['\"]",

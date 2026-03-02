@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from nanobot.agent.tools.base import Tool
-from nanobot.utils.media_cache import MediaCache
+from xcbot.agent.tools.base import Tool
+from xcbot.utils.media_cache import MediaCache
 
 
 class MediaTool(Tool):

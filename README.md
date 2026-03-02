@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="nanobot_logo.png" alt="nanobot" width="500">
-  <h1>nanobot: Ultra-Lightweight Personal AI Assistant</h1>
+  <img src="xcbot_logo.png" alt="xcbot" width="500">
+  <h1>xcbot: Ultra-Lightweight Personal AI Assistant</h1>
   <p>
-    <a href="https://pypi.org/project/nanobot-ai/"><img src="https://img.shields.io/pypi/v/nanobot-ai" alt="PyPI"></a>
-    <a href="https://pepy.tech/project/nanobot-ai"><img src="https://static.pepy.tech/badge/nanobot-ai" alt="Downloads"></a>
+    <a href="https://pypi.org/project/xcbot-ai/"><img src="https://img.shields.io/pypi/v/xcbot-ai" alt="PyPI"></a>
+    <a href="https://pepy.tech/project/xcbot-ai"><img src="https://static.pepy.tech/badge/xcbot-ai" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/python-≥3.11-blue" alt="Python">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
     <a href="./COMMUNICATION.md"><img src="https://img.shields.io/badge/Feishu-Group-E9DBFC?style=flat&logo=feishu&logoColor=white" alt="Feishu"></a>
@@ -12,7 +12,7 @@
   </p>
 </div>
 
-🐈 **nanobot** is an **ultra-lightweight** personal AI assistant inspired by [OpenClaw](https://github.com/openclaw/openclaw) 
+🐈 **xcbot** is an **ultra-lightweight** personal AI assistant inspired by [OpenClaw](https://github.com/openclaw/openclaw) 
 
 ⚡️ Delivers core agent functionality in just **~4,000** lines of code — **99% smaller** than Clawdbot's 430k+ lines.
 
@@ -20,37 +20,37 @@
 
 ## 📢 News
 
-- **2026-02-24** 🚀 Released **v0.1.4.post2** — a reliability-focused release with a redesigned heartbeat, prompt cache optimization, and hardened provider & channel stability. See [release notes](https://github.com/HKUDS/nanobot/releases/tag/v0.1.4.post2) for details.
+- **2026-02-24** 🚀 Released **v0.1.4.post2** — a reliability-focused release with a redesigned heartbeat, prompt cache optimization, and hardened provider & channel stability. See [release notes](https://github.com/HKUDS/xcbot/releases/tag/v0.1.4.post2) for details.
 - **2026-02-23** 🔧 Virtual tool-call heartbeat, prompt cache optimization, Slack mrkdwn fixes.
 - **2026-02-22** 🛡️ Slack thread isolation, Discord typing fix, agent reliability improvements.
-- **2026-02-21** 🎉 Released **v0.1.4.post1** — new providers, media support across channels, and major stability improvements. See [release notes](https://github.com/HKUDS/nanobot/releases/tag/v0.1.4.post1) for details.
+- **2026-02-21** 🎉 Released **v0.1.4.post1** — new providers, media support across channels, and major stability improvements. See [release notes](https://github.com/HKUDS/xcbot/releases/tag/v0.1.4.post1) for details.
 - **2026-02-20** 🐦 Feishu now receives multimodal files from users. More reliable memory under the hood.
 - **2026-02-19** ✨ Slack now sends files, Discord splits long messages, and subagents work in CLI mode.
-- **2026-02-18** ⚡️ nanobot now supports VolcEngine, MCP custom auth headers, and Anthropic prompt caching.
-- **2026-02-17** 🎉 Released **v0.1.4** — MCP support, progress streaming, new providers, and multiple channel improvements. Please see [release notes](https://github.com/HKUDS/nanobot/releases/tag/v0.1.4) for details.
-- **2026-02-16** 🦞 nanobot now integrates a [ClawHub](https://clawhub.ai) skill — search and install public agent skills.
-- **2026-02-15** 🔑 nanobot now supports OpenAI Codex provider with OAuth login support.
-- **2026-02-14** 🔌 nanobot now supports MCP! See [MCP section](#mcp-model-context-protocol) for details.
-- **2026-02-13** 🎉 Released **v0.1.3.post7** — includes security hardening and multiple improvements. **Please upgrade to the latest version to address security issues**. See [release notes](https://github.com/HKUDS/nanobot/releases/tag/v0.1.3.post7) for more details.
-- **2026-02-12** 🧠 Redesigned memory system — Less code, more reliable. Join the [discussion](https://github.com/HKUDS/nanobot/discussions/566) about it!
+- **2026-02-18** ⚡️ xcbot now supports VolcEngine, MCP custom auth headers, and Anthropic prompt caching.
+- **2026-02-17** 🎉 Released **v0.1.4** — MCP support, progress streaming, new providers, and multiple channel improvements. Please see [release notes](https://github.com/HKUDS/xcbot/releases/tag/v0.1.4) for details.
+- **2026-02-16** 🦞 xcbot now integrates a [ClawHub](https://clawhub.ai) skill — search and install public agent skills.
+- **2026-02-15** 🔑 xcbot now supports OpenAI Codex provider with OAuth login support.
+- **2026-02-14** 🔌 xcbot now supports MCP! See [MCP section](#mcp-model-context-protocol) for details.
+- **2026-02-13** 🎉 Released **v0.1.3.post7** — includes security hardening and multiple improvements. **Please upgrade to the latest version to address security issues**. See [release notes](https://github.com/HKUDS/xcbot/releases/tag/v0.1.3.post7) for more details.
+- **2026-02-12** 🧠 Redesigned memory system — Less code, more reliable. Join the [discussion](https://github.com/HKUDS/xcbot/discussions/566) about it!
 - **2026-02-11** ✨ Enhanced CLI experience and added MiniMax support!
 
 <details>
 <summary>Earlier news</summary>
 
-- **2026-02-10** 🎉 Released **v0.1.3.post6** with improvements! Check the updates [notes](https://github.com/HKUDS/nanobot/releases/tag/v0.1.3.post6) and our [roadmap](https://github.com/HKUDS/nanobot/discussions/431).
-- **2026-02-09** 💬 Added Slack, Email, and QQ support — nanobot now supports multiple chat platforms!
+- **2026-02-10** 🎉 Released **v0.1.3.post6** with improvements! Check the updates [notes](https://github.com/HKUDS/xcbot/releases/tag/v0.1.3.post6) and our [roadmap](https://github.com/HKUDS/xcbot/discussions/431).
+- **2026-02-09** 💬 Added Slack, Email, and QQ support — xcbot now supports multiple chat platforms!
 - **2026-02-08** 🔧 Refactored Providers—adding a new LLM provider now takes just 2 simple steps! Check [here](#providers).
-- **2026-02-07** 🚀 Released **v0.1.3.post5** with Qwen support & several key improvements! Check [here](https://github.com/HKUDS/nanobot/releases/tag/v0.1.3.post5) for details.
+- **2026-02-07** 🚀 Released **v0.1.3.post5** with Qwen support & several key improvements! Check [here](https://github.com/HKUDS/xcbot/releases/tag/v0.1.3.post5) for details.
 - **2026-02-06** ✨ Added Moonshot/Kimi provider, Discord integration, and enhanced security hardening!
 - **2026-02-05** ✨ Added Feishu channel, DeepSeek provider, and enhanced scheduled tasks support!
-- **2026-02-04** 🚀 Released **v0.1.3.post4** with multi-provider & Docker support! Check [here](https://github.com/HKUDS/nanobot/releases/tag/v0.1.3.post4) for details.
+- **2026-02-04** 🚀 Released **v0.1.3.post4** with multi-provider & Docker support! Check [here](https://github.com/HKUDS/xcbot/releases/tag/v0.1.3.post4) for details.
 - **2026-02-03** ⚡ Integrated vLLM for local LLM support and improved natural language task scheduling!
-- **2026-02-02** 🎉 nanobot officially launched! Welcome to try 🐈 nanobot!
+- **2026-02-02** 🎉 xcbot officially launched! Welcome to try 🐈 xcbot!
 
 </details>
 
-## Key Features of nanobot:
+## Key Features of xcbot:
 
 🪶 **Ultra-Lightweight**: Just ~4,000 lines of core agent code — 99% smaller than Clawdbot.
 
@@ -63,7 +63,7 @@
 ## 🏗️ Architecture
 
 <p align="center">
-  <img src="nanobot_arch.png" alt="nanobot architecture" width="800">
+  <img src="xcbot_arch.png" alt="xcbot architecture" width="800">
 </p>
 
 ## ✨ Features
@@ -94,36 +94,36 @@
 **Install from source** (latest features, recommended for development)
 
 ```bash
-git clone https://github.com/HKUDS/nanobot.git
-cd nanobot
+git clone https://github.com/HKUDS/xcbot.git
+cd xcbot
 pip install -e .
 ```
 
 **Install with [uv](https://github.com/astral-sh/uv)** (stable, fast)
 
 ```bash
-uv tool install nanobot-ai
+uv tool install xcbot-ai
 ```
 
 **Install from PyPI** (stable)
 
 ```bash
-pip install nanobot-ai
+pip install xcbot-ai
 ```
 
 ## 🚀 Quick Start
 
 > [!TIP]
-> Set your API key in `~/.nanobot/config.json`.
+> Set your API key in `~/.xcbot/config.json`.
 > Get API keys: [OpenRouter](https://openrouter.ai/keys) (Global) · [Brave Search](https://brave.com/search/api/) (optional, for web search)
 
 **1. Initialize**
 
 ```bash
-nanobot onboard
+xcbot onboard
 ```
 
-**2. Configure** (`~/.nanobot/config.json`)
+**2. Configure** (`~/.xcbot/config.json`)
 
 Add or merge these **two parts** into your config (other options have defaults).
 
@@ -153,14 +153,14 @@ Add or merge these **two parts** into your config (other options have defaults).
 **3. Chat**
 
 ```bash
-nanobot agent
+xcbot agent
 ```
 
 That's it! You have a working AI assistant in 2 minutes.
 
 ## 💬 Chat Apps
 
-Connect nanobot to your favorite chat platform.
+Connect xcbot to your favorite chat platform.
 
 | Channel | What you need |
 |---------|---------------|
@@ -203,7 +203,7 @@ Connect nanobot to your favorite chat platform.
 **3. Run**
 
 ```bash
-nanobot gateway
+xcbot gateway
 ```
 
 </details>
@@ -213,30 +213,30 @@ nanobot gateway
 
 Uses **Socket.IO WebSocket** by default, with HTTP polling fallback.
 
-**1. Ask nanobot to set up Mochat for you**
+**1. Ask xcbot to set up Mochat for you**
 
-Simply send this message to nanobot (replace `xxx@xxx` with your real email):
+Simply send this message to xcbot (replace `xxx@xxx` with your real email):
 
 ```
-Read https://raw.githubusercontent.com/HKUDS/MoChat/refs/heads/main/skills/nanobot/skill.md and register on MoChat. My Email account is xxx@xxx Bind me as your owner and DM me on MoChat.
+Read https://raw.githubusercontent.com/HKUDS/MoChat/refs/heads/main/skills/xcbot/skill.md and register on MoChat. My Email account is xxx@xxx Bind me as your owner and DM me on MoChat.
 ```
 
-nanobot will automatically register, configure `~/.nanobot/config.json`, and connect to Mochat.
+xcbot will automatically register, configure `~/.xcbot/config.json`, and connect to Mochat.
 
 **2. Restart gateway**
 
 ```bash
-nanobot gateway
+xcbot gateway
 ```
 
-That's it — nanobot handles the rest!
+That's it — xcbot handles the rest!
 
 <br>
 
 <details>
 <summary>Manual configuration (advanced)</summary>
 
-If you prefer to configure manually, add the following to `~/.nanobot/config.json`:
+If you prefer to configure manually, add the following to `~/.xcbot/config.json`:
 
 > Keep `claw_token` private. It should only be sent in `X-Claw-Token` header to your Mochat API endpoint.
 
@@ -304,7 +304,7 @@ If you prefer to configure manually, add the following to `~/.nanobot/config.jso
 **6. Run**
 
 ```bash
-nanobot gateway
+xcbot gateway
 ```
 
 </details>
@@ -315,7 +315,7 @@ nanobot gateway
 Install Matrix dependencies first:
 
 ```bash
-pip install nanobot-ai[matrix]
+pip install xcbot-ai[matrix]
 ```
 
 **1. Create/choose a Matrix account**
@@ -326,7 +326,7 @@ pip install nanobot-ai[matrix]
 **2. Get credentials**
 
 - You need:
-  - `userId` (example: `@nanobot:matrix.org`)
+  - `userId` (example: `@xcbot:matrix.org`)
   - `accessToken`
   - `deviceId` (recommended so sync tokens can be restored across restarts)
 - You can obtain these from your homeserver login API (`/_matrix/client/v3/login`) or from your client's advanced session settings.
@@ -339,9 +339,9 @@ pip install nanobot-ai[matrix]
     "matrix": {
       "enabled": true,
       "homeserver": "https://matrix.org",
-      "userId": "@nanobot:matrix.org",
+      "userId": "@xcbot:matrix.org",
       "accessToken": "syt_xxx",
-      "deviceId": "NANOBOT01",
+      "deviceId": "xcbot01",
       "e2eeEnabled": true,
       "allowFrom": [],
       "groupPolicy": "open",
@@ -370,7 +370,7 @@ pip install nanobot-ai[matrix]
 **4. Run**
 
 ```bash
-nanobot gateway
+xcbot gateway
 ```
 
 </details>
@@ -383,7 +383,7 @@ Requires **Node.js ≥18**.
 **1. Link device**
 
 ```bash
-nanobot channels login
+xcbot channels login
 # Scan QR with WhatsApp → Settings → Linked Devices
 ```
 
@@ -404,10 +404,10 @@ nanobot channels login
 
 ```bash
 # Terminal 1
-nanobot channels login
+xcbot channels login
 
 # Terminal 2
-nanobot gateway
+xcbot gateway
 ```
 
 </details>
@@ -422,7 +422,7 @@ Uses **WebSocket** long connection — no public IP required.
 - Create a new app → Enable **Bot** capability
 - **Permissions**: Add `im:message` (send messages)
 - **Events**: Add `im.message.receive_v1` (receive messages)
-  - Select **Long Connection** mode (requires running nanobot first to establish connection)
+  - Select **Long Connection** mode (requires running xcbot first to establish connection)
 - Get **App ID** and **App Secret** from "Credentials & Basic Info"
 - Publish the app
 
@@ -472,7 +472,7 @@ When Feishu is enabled, the agent gets a built-in tool `feishu_chat_history` to 
 **3. Run**
 
 ```bash
-nanobot gateway
+xcbot gateway
 ```
 
 > [!TIP]
@@ -497,7 +497,7 @@ Uses **botpy SDK** with WebSocket — no public IP required. Currently supports 
 
 **3. Configure**
 
-> - `allowFrom`: Leave empty for public access, or add user openids to restrict. You can find openids in the nanobot logs when a user messages the bot.
+> - `allowFrom`: Leave empty for public access, or add user openids to restrict. You can find openids in the xcbot logs when a user messages the bot.
 > - For production: submit a review in the bot console and publish. See [QQ Bot Docs](https://bot.q.qq.com/wiki/) for the full publishing flow.
 
 ```json
@@ -516,7 +516,7 @@ Uses **botpy SDK** with WebSocket — no public IP required. Currently supports 
 **4. Run**
 
 ```bash
-nanobot gateway
+xcbot gateway
 ```
 
 Now send a message to the bot from QQ — it should respond!
@@ -557,7 +557,7 @@ Uses **Stream Mode** — no public IP required.
 **3. Run**
 
 ```bash
-nanobot gateway
+xcbot gateway
 ```
 
 </details>
@@ -578,7 +578,7 @@ Uses **Socket Mode** — no public URL required.
 - **App Home**: Scroll to **Show Tabs** → Enable **Messages Tab** → Check **"Allow users to send Slash commands and messages from the messages tab"**
 - **Install App**: Click **Install to Workspace** → Authorize → copy the **Bot Token** (`xoxb-...`)
 
-**3. Configure nanobot**
+**3. Configure xcbot**
 
 ```json
 {
@@ -596,7 +596,7 @@ Uses **Socket Mode** — no public URL required.
 **4. Run**
 
 ```bash
-nanobot gateway
+xcbot gateway
 ```
 
 DM the bot directly or @mention it in a channel — it should respond!
@@ -610,10 +610,10 @@ DM the bot directly or @mention it in a channel — it should respond!
 <details>
 <summary><b>Email</b></summary>
 
-Give nanobot its own email account. It polls **IMAP** for incoming mail and replies via **SMTP** — like a personal email assistant.
+Give xcbot its own email account. It polls **IMAP** for incoming mail and replies via **SMTP** — like a personal email assistant.
 
 **1. Get credentials (Gmail example)**
-- Create a dedicated Gmail account for your bot (e.g. `my-nanobot@gmail.com`)
+- Create a dedicated Gmail account for your bot (e.g. `my-xcbot@gmail.com`)
 - Enable 2-Step Verification → Create an [App Password](https://myaccount.google.com/apppasswords)
 - Use this app password for both IMAP and SMTP
 
@@ -632,13 +632,13 @@ Give nanobot its own email account. It polls **IMAP** for incoming mail and repl
       "consentGranted": true,
       "imapHost": "imap.gmail.com",
       "imapPort": 993,
-      "imapUsername": "my-nanobot@gmail.com",
+      "imapUsername": "my-xcbot@gmail.com",
       "imapPassword": "your-app-password",
       "smtpHost": "smtp.gmail.com",
       "smtpPort": 587,
-      "smtpUsername": "my-nanobot@gmail.com",
+      "smtpUsername": "my-xcbot@gmail.com",
       "smtpPassword": "your-app-password",
-      "fromAddress": "my-nanobot@gmail.com",
+      "fromAddress": "my-xcbot@gmail.com",
       "allowFrom": ["your-real-email@gmail.com"]
     }
   }
@@ -649,25 +649,25 @@ Give nanobot its own email account. It polls **IMAP** for incoming mail and repl
 **3. Run**
 
 ```bash
-nanobot gateway
+xcbot gateway
 ```
 
 </details>
 
 ## 🌐 Agent Social Network
 
-🐈 nanobot is capable of linking to the agent social network (agent community). **Just send one message and your nanobot joins automatically!**
+🐈 xcbot is capable of linking to the agent social network (agent community). **Just send one message and your xcbot joins automatically!**
 
 | Platform | How to Join (send this message to your bot) |
 |----------|-------------|
 | [**Moltbook**](https://www.moltbook.com/) | `Read https://moltbook.com/skill.md and follow the instructions to join Moltbook` |
 | [**ClawdChat**](https://clawdchat.ai/) | `Read https://clawdchat.ai/skill.md and follow the instructions to join ClawdChat` |
 
-Simply send the command above to your nanobot (via CLI or any chat channel), and it will handle the rest.
+Simply send the command above to your xcbot (via CLI or any chat channel), and it will handle the rest.
 
 ## ⚙️ Configuration
 
-Config file: `~/.nanobot/config.json`
+Config file: `~/.xcbot/config.json`
 
 ### Providers
 
@@ -694,8 +694,8 @@ Config file: `~/.nanobot/config.json`
 | `moonshot` | LLM (Moonshot/Kimi) | [platform.moonshot.cn](https://platform.moonshot.cn) |
 | `zhipu` | LLM (Zhipu GLM) | [open.bigmodel.cn](https://open.bigmodel.cn) |
 | `vllm` | LLM (local, any OpenAI-compatible server) | — |
-| `openai_codex` | LLM (Codex, OAuth) | `nanobot provider login openai-codex` |
-| `github_copilot` | LLM (GitHub Copilot, OAuth) | `nanobot provider login github-copilot` |
+| `openai_codex` | LLM (Codex, OAuth) | `xcbot provider login openai-codex` |
+| `github_copilot` | LLM (GitHub Copilot, OAuth) | `xcbot provider login github-copilot` |
 
 <details>
 <summary><b>OpenAI Codex (OAuth)</b></summary>
@@ -704,10 +704,10 @@ Codex uses OAuth instead of API keys. Requires a ChatGPT Plus or Pro account.
 
 **1. Login:**
 ```bash
-nanobot provider login openai-codex
+xcbot provider login openai-codex
 ```
 
-**2. Set model** (merge into `~/.nanobot/config.json`):
+**2. Set model** (merge into `~/.xcbot/config.json`):
 ```json
 {
   "agents": {
@@ -720,7 +720,7 @@ nanobot provider login openai-codex
 
 **3. Chat:**
 ```bash
-nanobot agent -m "Hello!"
+xcbot agent -m "Hello!"
 ```
 
 > Docker users: use `docker run -it` for interactive OAuth login.
@@ -762,7 +762,7 @@ Run your own model with vLLM or any OpenAI-compatible server, then add to config
 vllm serve meta-llama/Llama-3.1-8B-Instruct --port 8000
 ```
 
-**2. Add to config** (partial — merge into `~/.nanobot/config.json`):
+**2. Add to config** (partial — merge into `~/.xcbot/config.json`):
 
 *Provider (key can be any non-empty string for local):*
 ```json
@@ -792,23 +792,23 @@ vllm serve meta-llama/Llama-3.1-8B-Instruct --port 8000
 <details>
 <summary><b>Adding a New Provider (Developer Guide)</b></summary>
 
-nanobot uses a **Provider Registry** (`nanobot/providers/registry.py`) as the single source of truth.
+xcbot uses a **Provider Registry** (`xcbot/providers/registry.py`) as the single source of truth.
 Adding a new provider only takes **2 steps** — no if-elif chains to touch.
 
-**Step 1.** Add a `ProviderSpec` entry to `PROVIDERS` in `nanobot/providers/registry.py`:
+**Step 1.** Add a `ProviderSpec` entry to `PROVIDERS` in `xcbot/providers/registry.py`:
 
 ```python
 ProviderSpec(
     name="myprovider",                   # config field name
     keywords=("myprovider", "mymodel"),  # model-name keywords for auto-matching
     env_key="MYPROVIDER_API_KEY",        # env var for LiteLLM
-    display_name="My Provider",          # shown in `nanobot status`
+    display_name="My Provider",          # shown in `xcbot status`
     litellm_prefix="myprovider",         # auto-prefix: model → myprovider/model
     skip_prefixes=("myprovider/",),      # don't double-prefix
 )
 ```
 
-**Step 2.** Add a field to `ProvidersConfig` in `nanobot/config/schema.py`:
+**Step 2.** Add a field to `ProvidersConfig` in `xcbot/config/schema.py`:
 
 ```python
 class ProvidersConfig(BaseModel):
@@ -816,7 +816,7 @@ class ProvidersConfig(BaseModel):
     myprovider: ProviderConfig = ProviderConfig()
 ```
 
-That's it! Environment variables, model prefixing, config matching, and `nanobot status` display will all work automatically.
+That's it! Environment variables, model prefixing, config matching, and `xcbot status` display will all work automatically.
 
 **Common `ProviderSpec` options:**
 
@@ -839,7 +839,7 @@ That's it! Environment variables, model prefixing, config matching, and `nanobot
 > [!TIP]
 > The config format is compatible with Claude Desktop / Cursor. You can copy MCP server configs directly from any MCP server's README.
 
-nanobot supports [MCP](https://modelcontextprotocol.io/) — connect external tool servers and use them as native agent tools.
+xcbot supports [MCP](https://modelcontextprotocol.io/) — connect external tool servers and use them as native agent tools.
 
 Add MCP servers to your `config.json`:
 
@@ -905,16 +905,16 @@ MCP tools are automatically discovered and registered on startup. The LLM can us
 
 | Command | Description |
 |---------|-------------|
-| `nanobot onboard` | Initialize config & workspace |
-| `nanobot agent -m "..."` | Chat with the agent |
-| `nanobot agent` | Interactive chat mode |
-| `nanobot agent --no-markdown` | Show plain-text replies |
-| `nanobot agent --logs` | Show runtime logs during chat |
-| `nanobot gateway` | Start the gateway |
-| `nanobot status` | Show status |
-| `nanobot provider login openai-codex` | OAuth login for providers |
-| `nanobot channels login` | Link WhatsApp (scan QR) |
-| `nanobot channels status` | Show channel status |
+| `xcbot onboard` | Initialize config & workspace |
+| `xcbot agent -m "..."` | Chat with the agent |
+| `xcbot agent` | Interactive chat mode |
+| `xcbot agent --no-markdown` | Show plain-text replies |
+| `xcbot agent --logs` | Show runtime logs during chat |
+| `xcbot gateway` | Start the gateway |
+| `xcbot status` | Show status |
+| `xcbot provider login openai-codex` | OAuth login for providers |
+| `xcbot channels login` | Link WhatsApp (scan QR) |
+| `xcbot channels status` | Show channel status |
 
 Interactive mode exits: `exit`, `quit`, `/exit`, `/quit`, `:q`, or `Ctrl+D`.
 
@@ -923,14 +923,14 @@ Interactive mode exits: `exit`, `quit`, `/exit`, `/quit`, `:q`, or `Ctrl+D`.
 
 ```bash
 # Add a job
-nanobot cron add --name "daily" --message "Good morning!" --cron "0 9 * * *"
-nanobot cron add --name "hourly" --message "Check status" --every 3600
+xcbot cron add --name "daily" --message "Good morning!" --cron "0 9 * * *"
+xcbot cron add --name "hourly" --message "Check status" --every 3600
 
 # List jobs
-nanobot cron list
+xcbot cron list
 
 # Remove a job
-nanobot cron remove <job_id>
+xcbot cron remove <job_id>
 ```
 
 </details>
@@ -938,9 +938,9 @@ nanobot cron remove <job_id>
 <details>
 <summary><b>Heartbeat (Periodic Tasks)</b></summary>
 
-The gateway wakes up every 30 minutes and checks `HEARTBEAT.md` in your workspace (`~/.nanobot/workspace/HEARTBEAT.md`). If the file has tasks, the agent executes them and delivers results to your most recently active chat channel.
+The gateway wakes up every 30 minutes and checks `HEARTBEAT.md` in your workspace (`~/.xcbot/workspace/HEARTBEAT.md`). If the file has tasks, the agent executes them and delivers results to your most recently active chat channel.
 
-**Setup:** edit `~/.nanobot/workspace/HEARTBEAT.md` (created automatically by `nanobot onboard`):
+**Setup:** edit `~/.xcbot/workspace/HEARTBEAT.md` (created automatically by `xcbot onboard`):
 
 ```markdown
 ## Periodic Tasks
@@ -951,26 +951,26 @@ The gateway wakes up every 30 minutes and checks `HEARTBEAT.md` in your workspac
 
 The agent can also manage this file itself — ask it to "add a periodic task" and it will update `HEARTBEAT.md` for you.
 
-> **Note:** The gateway must be running (`nanobot gateway`) and you must have chatted with the bot at least once so it knows which channel to deliver to.
+> **Note:** The gateway must be running (`xcbot gateway`) and you must have chatted with the bot at least once so it knows which channel to deliver to.
 
 </details>
 
 ## 🐳 Docker
 
 > [!TIP]
-> The `-v ~/.nanobot:/root/.nanobot` flag mounts your local config directory into the container, so your config and workspace persist across container restarts.
+> The `-v ~/.xcbot:/root/.xcbot` flag mounts your local config directory into the container, so your config and workspace persist across container restarts.
 
 ### Docker Compose
 
 ```bash
-docker compose run --rm nanobot-cli onboard   # first-time setup
-vim ~/.nanobot/config.json                     # add API keys
-docker compose up -d nanobot-gateway           # start gateway
+docker compose run --rm xcbot-cli onboard   # first-time setup
+vim ~/.xcbot/config.json                     # add API keys
+docker compose up -d xcbot-gateway           # start gateway
 ```
 
 ```bash
-docker compose run --rm nanobot-cli agent -m "Hello!"   # run CLI
-docker compose logs -f nanobot-gateway                   # view logs
+docker compose run --rm xcbot-cli agent -m "Hello!"   # run CLI
+docker compose logs -f xcbot-gateway                   # view logs
 docker compose down                                      # stop
 ```
 
@@ -978,42 +978,42 @@ docker compose down                                      # stop
 
 ```bash
 # Build the image
-docker build -t nanobot .
+docker build -t xcbot .
 
 # Initialize config (first time only)
-docker run -v ~/.nanobot:/root/.nanobot --rm nanobot onboard
+docker run -v ~/.xcbot:/root/.xcbot --rm xcbot onboard
 
 # Edit config on host to add API keys
-vim ~/.nanobot/config.json
+vim ~/.xcbot/config.json
 
 # Run gateway (connects to enabled channels, e.g. Telegram/Discord/Mochat)
-docker run -v ~/.nanobot:/root/.nanobot -p 18790:18790 nanobot gateway
+docker run -v ~/.xcbot:/root/.xcbot -p 18790:18790 xcbot gateway
 
 # Or run a single command
-docker run -v ~/.nanobot:/root/.nanobot --rm nanobot agent -m "Hello!"
-docker run -v ~/.nanobot:/root/.nanobot --rm nanobot status
+docker run -v ~/.xcbot:/root/.xcbot --rm xcbot agent -m "Hello!"
+docker run -v ~/.xcbot:/root/.xcbot --rm xcbot status
 ```
 
 ## 🐧 Linux Service
 
 Run the gateway as a systemd user service so it starts automatically and restarts on failure.
 
-**1. Find the nanobot binary path:**
+**1. Find the xcbot binary path:**
 
 ```bash
-which nanobot   # e.g. /home/user/.local/bin/nanobot
+which xcbot   # e.g. /home/user/.local/bin/xcbot
 ```
 
-**2. Create the service file** at `~/.config/systemd/user/nanobot-gateway.service` (replace `ExecStart` path if needed):
+**2. Create the service file** at `~/.config/systemd/user/xcbot-gateway.service` (replace `ExecStart` path if needed):
 
 ```ini
 [Unit]
-Description=Nanobot Gateway
+Description=xcbot Gateway
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/nanobot gateway
+ExecStart=%h/.local/bin/xcbot gateway
 Restart=always
 RestartSec=10
 NoNewPrivileges=yes
@@ -1028,15 +1028,15 @@ WantedBy=default.target
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now nanobot-gateway
+systemctl --user enable --now xcbot-gateway
 ```
 
 **Common operations:**
 
 ```bash
-systemctl --user status nanobot-gateway        # check status
-systemctl --user restart nanobot-gateway       # restart after config changes
-journalctl --user -u nanobot-gateway -f        # follow logs
+systemctl --user status xcbot-gateway        # check status
+systemctl --user restart xcbot-gateway       # restart after config changes
+journalctl --user -u xcbot-gateway -f        # follow logs
 ```
 
 If you edit the `.service` file itself, run `systemctl --user daemon-reload` before restarting.
@@ -1050,7 +1050,7 @@ If you edit the `.service` file itself, run `systemctl --user daemon-reload` bef
 ## 📁 Project Structure
 
 ```
-nanobot/
+xcbot/
 ├── agent/          # 🧠 Core agent logic
 │   ├── loop.py     #    Agent loop (LLM ↔ tool execution)
 │   ├── context.py  #    Prompt builder
@@ -1073,7 +1073,7 @@ nanobot/
 
 PRs welcome! The codebase is intentionally small and readable. 🤗
 
-**Roadmap** — Pick an item and [open a PR](https://github.com/HKUDS/nanobot/pulls)!
+**Roadmap** — Pick an item and [open a PR](https://github.com/HKUDS/xcbot/pulls)!
 
 - [ ] **Multi-modal** — See and hear (images, voice, video)
 - [ ] **Long-term memory** — Never forget important context
@@ -1083,29 +1083,29 @@ PRs welcome! The codebase is intentionally small and readable. 🤗
 
 ### Contributors
 
-<a href="https://github.com/HKUDS/nanobot/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=HKUDS/nanobot&max=100&columns=12&updated=20260210" alt="Contributors" />
+<a href="https://github.com/HKUDS/xcbot/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=HKUDS/xcbot&max=100&columns=12&updated=20260210" alt="Contributors" />
 </a>
 
 
 ## ⭐ Star History
 
 <div align="center">
-  <a href="https://star-history.com/#HKUDS/nanobot&Date">
+  <a href="https://star-history.com/#HKUDS/xcbot&Date">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=HKUDS/nanobot&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=HKUDS/nanobot&type=Date" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=HKUDS/nanobot&type=Date" style="border-radius: 15px; box-shadow: 0 0 30px rgba(0, 217, 255, 0.3);" />
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=HKUDS/xcbot&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=HKUDS/xcbot&type=Date" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=HKUDS/xcbot&type=Date" style="border-radius: 15px; box-shadow: 0 0 30px rgba(0, 217, 255, 0.3);" />
     </picture>
   </a>
 </div>
 
 <p align="center">
-  <em> Thanks for visiting ✨ nanobot!</em><br><br>
-  <img src="https://visitor-badge.laobi.icu/badge?page_id=HKUDS.nanobot&style=for-the-badge&color=00d4ff" alt="Views">
+  <em> Thanks for visiting ✨ xcbot!</em><br><br>
+  <img src="https://visitor-badge.laobi.icu/badge?page_id=HKUDS.xcbot&style=for-the-badge&color=00d4ff" alt="Views">
 </p>
 
 
 <p align="center">
-  <sub>nanobot is for educational, research, and technical exchange purposes only</sub>
+  <sub>xcbot is for educational, research, and technical exchange purposes only</sub>
 </p>

@@ -6,8 +6,8 @@ from typing import Any
 
 from loguru import logger
 
-from nanobot.bus.events import InboundMessage, OutboundMessage
-from nanobot.bus.queue import MessageBus
+from xcbot.bus.events import InboundMessage, OutboundMessage
+from xcbot.bus.queue import MessageBus
 
 
 class BaseChannel(ABC):
@@ -15,7 +15,7 @@ class BaseChannel(ABC):
     Abstract base class for chat channel implementations.
     
     Each channel (Telegram, Discord, etc.) should implement this interface
-    to integrate with the nanobot message bus.
+    to integrate with the xcbot message bus.
     """
     
     name: str = "base"

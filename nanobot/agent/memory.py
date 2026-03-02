@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from nanobot.utils.helpers import ensure_dir
+from xcbot.utils.helpers import ensure_dir
 
 if TYPE_CHECKING:
-    from nanobot.providers.base import LLMProvider
-    from nanobot.session.manager import Session
+    from xcbot.providers.base import LLMProvider
+    from xcbot.session.manager import Session
 
 
 _SAVE_MEMORY_TOOL = [
@@ -253,7 +253,7 @@ class MemoryStore:
             )
 
             prompt = (
-                "You are nanobot's task learning recorder.\n\n"
+                "You are xcbot's task learning recorder.\n\n"
                 "Goals:\n"
                 "1) Always produce a grep-friendly HISTORY entry (2-5 sentences).\n"
                 "2) Update long-term MEMORY only for stable facts/preferences/constraints.\n"

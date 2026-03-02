@@ -3,11 +3,11 @@ x-common-config: &common-config
     context: .
     dockerfile: Dockerfile
   volumes:
-    - ./deploy/nanobot:/root/.nanobot
+    - ./deploy/xcbot:/root/.xcbot
 
 services:
   mihomo:
-    container_name: nanobot-proxy
+    container_name: xcbot-proxy
     image: docker.io/metacubex/mihomo:Alpha
     restart: unless-stopped
     cap_add:
@@ -21,15 +21,15 @@ services:
       - ./deploy/proxy/mihomo:/etc/mihomo
     # 端口不映射到宿主机，只给内部服务通过 network_mode 使用
 
-  nanobot-gateway:
-    container_name: nanobot-gateway
+  xcbot-gateway:
+    container_name: xcbot-gateway
     <<: *common-config
     network_mode: service:mihomo
     depends_on:
       - mihomo
     command: ["gateway"]
 
-  nanobot-cli:
+  xcbot-cli:
     <<: *common-config
     profiles:
       - cli

@@ -6,7 +6,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any
 
-from nanobot.utils.helpers import ensure_dir, timestamp
+from xcbot.utils.helpers import ensure_dir, timestamp
 
 
 class MediaCache:

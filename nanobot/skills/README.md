@@ -1,6 +1,6 @@
-# nanobot Skills
+# xcbot Skills
 
-This directory contains built-in skills that extend nanobot's capabilities.
+This directory contains built-in skills that extend xcbot's capabilities.
 
 ## Skill Format
 

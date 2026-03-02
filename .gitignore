@@ -22,5 +22,5 @@ botpy.log
 tests/
 .DS_Store
 .idea/
-deploy/nanobot/
+deploy/xcbot/
 examples/

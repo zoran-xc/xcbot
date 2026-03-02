@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEPLOY_DIR="$ROOT_DIR/deploy"
-RUNTIME_DIR="$DEPLOY_DIR/nanobot"
+RUNTIME_DIR="$DEPLOY_DIR/xcbot"
 TEMPLATE_CFG="$DEPLOY_DIR/config.template.json"
 RUNTIME_CFG="$RUNTIME_DIR/config.json"
 
@@ -49,4 +49,4 @@ echo "Applied config: $TEMPLATE_CFG -> $RUNTIME_CFG"
 
 docker compose -f "$ROOT_DIR/docker-compose.proxy.yml" up -d --build >/dev/null
 
-docker compose -f "$ROOT_DIR/docker-compose.proxy.yml" run --rm nanobot-cli status
+docker compose -f "$ROOT_DIR/docker-compose.proxy.yml" run --rm xcbot-cli status

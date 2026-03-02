@@ -2,9 +2,9 @@
 
 from typing import Any
 
-from nanobot.agent.tools.base import Tool
-from nanobot.cron.service import CronService
-from nanobot.cron.types import CronSchedule
+from xcbot.agent.tools.base import Tool
+from xcbot.cron.service import CronService
+from xcbot.cron.types import CronSchedule
 
 
 class CronTool(Tool):

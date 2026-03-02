@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEPLOY_DIR="$ROOT_DIR/deploy"
-RUNTIME_DIR="$DEPLOY_DIR/nanobot"
+RUNTIME_DIR="$DEPLOY_DIR/xcbot"
 TEMPLATE_CFG="$DEPLOY_DIR/config.template.json"
 RUNTIME_CFG="$RUNTIME_DIR/config.json"
 HASH_FILE="$RUNTIME_DIR/.code_hash"
@@ -27,7 +27,7 @@ if command -v git >/dev/null 2>&1 && git -C "$ROOT_DIR" rev-parse --is-inside-wo
   } | shasum -a 256 | awk '{print $1}')"
 else
   CODE_HASH="$({
-    find "$ROOT_DIR/nanobot" -type f -print0 2>/dev/null | sort -z | xargs -0 shasum -a 256 2>/dev/null || true
+    find "$ROOT_DIR/xcbot" -type f -print0 2>/dev/null | sort -z | xargs -0 shasum -a 256 2>/dev/null || true
     shasum -a 256 "$ROOT_DIR/Dockerfile" 2>/dev/null || true
     shasum -a 256 "$ROOT_DIR/docker-compose.yml" 2>/dev/null || true
   } | shasum -a 256 | awk '{print $1}')"
@@ -39,13 +39,13 @@ if [[ -f "$HASH_FILE" ]]; then
 fi
 
 if [[ -n "$CODE_HASH" && "$CODE_HASH" != "$PREV_HASH" ]]; then
-  echo "Code changed, rebuilding nanobot-gateway..."
-  docker compose -f "$ROOT_DIR/docker-compose.yml" build nanobot-gateway
+  echo "Code changed, rebuilding xcbot-gateway..."
+  docker compose -f "$ROOT_DIR/docker-compose.yml" build xcbot-gateway
   printf "%s\n" "$CODE_HASH" > "$HASH_FILE"
 else
   echo "Code unchanged, skip build."
 fi
 
-docker compose -f "$ROOT_DIR/docker-compose.yml" up -d --force-recreate nanobot-gateway >/dev/null
+docker compose -f "$ROOT_DIR/docker-compose.yml" up -d --force-recreate xcbot-gateway >/dev/null
 
-docker compose -f "$ROOT_DIR/docker-compose.yml" run --rm nanobot-cli status
+docker compose -f "$ROOT_DIR/docker-compose.yml" run --rm xcbot-cli status

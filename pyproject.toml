@@ -1,11 +1,11 @@
 [project]
-name = "nanobot-ai"
+name = "xcbot-ai"
 version = "0.1.4.post2"
 description = "A lightweight personal AI assistant framework"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "nanobot contributors"}
+    {name = "xcbot contributors"}
 ]
 keywords = ["ai", "agent", "chatbot"]
 classifiers = [
@@ -57,37 +57,37 @@ dev = [
 ]
 
 [project.scripts]
-nanobot = "nanobot.cli.commands:app"
+xcbot = "xcbot.cli.commands:app"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["nanobot"]
+packages = ["xcbot"]
 
 [tool.hatch.build.targets.wheel.sources]
-"nanobot" = "nanobot"
+"xcbot" = "xcbot"
 
 # Include non-Python files in skills and templates
 [tool.hatch.build]
 include = [
-    "nanobot/**/*.py",
-    "nanobot/templates/**/*.md",
-    "nanobot/skills/**/*.md",
-    "nanobot/skills/**/*.sh",
+    "xcbot/**/*.py",
+    "xcbot/templates/**/*.md",
+    "xcbot/skills/**/*.md",
+    "xcbot/skills/**/*.sh",
 ]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "nanobot/",
+    "xcbot/",
     "bridge/",
     "README.md",
     "LICENSE",
 ]
 
 [tool.hatch.build.targets.wheel.force-include]
-"bridge" = "nanobot/bridge"
+"bridge" = "xcbot/bridge"
 
 [tool.ruff]
 line-length = 100

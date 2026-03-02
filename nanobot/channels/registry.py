@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from nanobot.bus.queue import MessageBus
-from nanobot.channels.base import BaseChannel
-from nanobot.config.schema import Config
+from xcbot.bus.queue import MessageBus
+from xcbot.channels.base import BaseChannel
+from xcbot.config.schema import Config
 
 
 @dataclass(frozen=True)
@@ -19,7 +19,7 @@ class ChannelSpec:
 
 
 def _build_telegram(config: Config, bus: MessageBus, workspace: Path) -> BaseChannel:
-    from nanobot.channels.telegram import TelegramChannel
+    from xcbot.channels.telegram import TelegramChannel
 
     return TelegramChannel(
         config.channels.telegram,
@@ -30,55 +30,55 @@ def _build_telegram(config: Config, bus: MessageBus, workspace: Path) -> BaseCha
 
 
 def _build_whatsapp(config: Config, bus: MessageBus, workspace: Path) -> BaseChannel:
-    from nanobot.channels.whatsapp import WhatsAppChannel
+    from xcbot.channels.whatsapp import WhatsAppChannel
 
     return WhatsAppChannel(config.channels.whatsapp, bus, workspace)
 
 
 def _build_discord(config: Config, bus: MessageBus, workspace: Path) -> BaseChannel:
-    from nanobot.channels.discord import DiscordChannel
+    from xcbot.channels.discord import DiscordChannel
 
     return DiscordChannel(config.channels.discord, bus, workspace)
 
 
 def _build_feishu(config: Config, bus: MessageBus, workspace: Path) -> BaseChannel:
-    from nanobot.channels.feishu import FeishuChannel
+    from xcbot.channels.feishu import FeishuChannel
 
     return FeishuChannel(config.channels.feishu, bus, workspace)
 
 
 def _build_mochat(config: Config, bus: MessageBus, workspace: Path) -> BaseChannel:
-    from nanobot.channels.mochat import MochatChannel
+    from xcbot.channels.mochat import MochatChannel
 
     return MochatChannel(config.channels.mochat, bus, workspace)
 
 
 def _build_dingtalk(config: Config, bus: MessageBus, workspace: Path) -> BaseChannel:
-    from nanobot.channels.dingtalk import DingTalkChannel
+    from xcbot.channels.dingtalk import DingTalkChannel
 
     return DingTalkChannel(config.channels.dingtalk, bus, workspace)
 
 
 def _build_email(config: Config, bus: MessageBus, workspace: Path) -> BaseChannel:
-    from nanobot.channels.email import EmailChannel
+    from xcbot.channels.email import EmailChannel
 
     return EmailChannel(config.channels.email, bus, workspace)
 
 
 def _build_slack(config: Config, bus: MessageBus, workspace: Path) -> BaseChannel:
-    from nanobot.channels.slack import SlackChannel
+    from xcbot.channels.slack import SlackChannel
 
     return SlackChannel(config.channels.slack, bus, workspace)
 
 
 def _build_qq(config: Config, bus: MessageBus, workspace: Path) -> BaseChannel:
-    from nanobot.channels.qq import QQChannel
+    from xcbot.channels.qq import QQChannel
 
     return QQChannel(config.channels.qq, bus, workspace)
 
 
 def _build_matrix(config: Config, bus: MessageBus, workspace: Path) -> BaseChannel:
-    from nanobot.channels.matrix import MatrixChannel
+    from xcbot.channels.matrix import MatrixChannel
 
     return MatrixChannel(config.channels.matrix, bus, workspace)
 

@@ -12,11 +12,11 @@ from typing import Any
 import httpx
 from loguru import logger
 
-from nanobot.bus.events import OutboundMessage
-from nanobot.bus.queue import MessageBus
-from nanobot.channels.base import BaseChannel
-from nanobot.config.schema import FeishuConfig
-from nanobot.utils.media_cache import MediaCache
+from xcbot.bus.events import OutboundMessage
+from xcbot.bus.queue import MessageBus
+from xcbot.channels.base import BaseChannel
+from xcbot.config.schema import FeishuConfig
+from xcbot.utils.media_cache import MediaCache
 
 try:
     import lark_oapi as lark
@@ -776,7 +776,7 @@ class FeishuChannel(BaseChannel):
             (file_path, content_text) - file_path is None if download failed
         """
         loop = asyncio.get_running_loop()
-        # KISS: persist inbound media into the nanobot workspace cache so that:
+        # KISS: persist inbound media into the xcbot workspace cache so that:
         # - InboundMessage.media can reference local files
         # - the `media` tool can query them via cache/media/index.jsonl
         #
@@ -919,7 +919,7 @@ class FeishuChannel(BaseChannel):
                         "header": {
                             "title": {
                                 "tag": "plain_text",
-                                "content": "nanobot",
+                                "content": "xcbot",
                             }
                         },
                         "elements": elements,

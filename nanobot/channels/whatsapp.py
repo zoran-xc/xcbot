@@ -7,10 +7,10 @@ from typing import Any
 
 from loguru import logger
 
-from nanobot.bus.events import OutboundMessage
-from nanobot.bus.queue import MessageBus
-from nanobot.channels.base import BaseChannel
-from nanobot.config.schema import WhatsAppConfig
+from xcbot.bus.events import OutboundMessage
+from xcbot.bus.queue import MessageBus
+from xcbot.channels.base import BaseChannel
+from xcbot.config.schema import WhatsAppConfig
 
 
 class WhatsAppChannel(BaseChannel):

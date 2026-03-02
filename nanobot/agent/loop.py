@@ -12,22 +12,22 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from loguru import logger
 
-from nanobot.agent.context import ContextBuilder
-from nanobot.agent.memory import MemoryStore
-from nanobot.agent.subagent import SubagentManager
-from nanobot.agent.subagent_task_store import SubagentTaskStore
-from nanobot.agent.wait_reminder import WaitReminderTimeout, run_with_ai_wait_reminder as wait_reminder_run
-from nanobot.agent.plan_header import PLAN_RULES, parse_plan_header
-from nanobot.agent.task_anchor import TaskAnchorEntry, TaskAnchorStore
-from nanobot.agent.tools.factory import build_tool_registry
-from nanobot.bus.events import InboundMessage, OutboundMessage
-from nanobot.bus.queue import MessageBus
-from nanobot.providers.base import LLMProvider
-from nanobot.session.manager import Session, SessionManager
+from xcbot.agent.context import ContextBuilder
+from xcbot.agent.memory import MemoryStore
+from xcbot.agent.subagent import SubagentManager
+from xcbot.agent.subagent_task_store import SubagentTaskStore
+from xcbot.agent.wait_reminder import WaitReminderTimeout, run_with_ai_wait_reminder as wait_reminder_run
+from xcbot.agent.plan_header import PLAN_RULES, parse_plan_header
+from xcbot.agent.task_anchor import TaskAnchorEntry, TaskAnchorStore
+from xcbot.agent.tools.factory import build_tool_registry
+from xcbot.bus.events import InboundMessage, OutboundMessage
+from xcbot.bus.queue import MessageBus
+from xcbot.providers.base import LLMProvider
+from xcbot.session.manager import Session, SessionManager
 
 if TYPE_CHECKING:
-    from nanobot.config.schema import ChannelsConfig, ExecToolConfig
-    from nanobot.cron.service import CronService
+    from xcbot.config.schema import ChannelsConfig, ExecToolConfig
+    from xcbot.cron.service import CronService
 
 
 class AgentLoop:
@@ -84,7 +84,7 @@ class AgentLoop:
         subagent_trace_dir: str = "subagents",
         subagent_trace_max_chars: int = 8000,
     ):
-        from nanobot.config.schema import ExecToolConfig
+        from xcbot.config.schema import ExecToolConfig
         self.bus = bus
         self.channels_config = channels_config
         self._interrupt_on_new_message = interrupt_on_new_message
@@ -175,7 +175,7 @@ class AgentLoop:
         if self._mcp_connected or self._mcp_connecting or not self._mcp_servers:
             return
         self._mcp_connecting = True
-        from nanobot.agent.tools.mcp import connect_mcp_servers
+        from xcbot.agent.tools.mcp import connect_mcp_servers
         try:
             self._mcp_stack = AsyncExitStack()
             await self._mcp_stack.__aenter__()
@@ -945,7 +945,7 @@ class AgentLoop:
                                   content="New session started.")
         if cmd == "/help":
             return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
-                                  content="🐈 nanobot commands:\n/new — Start a new conversation\n/stop — Stop the current task\n/help — Show available commands")
+                                  content="🐈 xcbot commands:\n/new — Start a new conversation\n/stop — Stop the current task\n/help — Show available commands")
 
         unconsolidated = len(session.messages) - session.last_consolidated
         if (unconsolidated >= self.memory_window and session.key not in self._consolidating):
@@ -969,7 +969,7 @@ class AgentLoop:
 
         self._set_tool_context(msg.channel, msg.chat_id, msg.metadata.get("message_id"))
         if message_tool := self.tools.get("message"):
-            from nanobot.agent.tools.message import MessageTool
+            from xcbot.agent.tools.message import MessageTool
             if isinstance(message_tool, MessageTool):
                 message_tool.start_turn()
 
@@ -1127,7 +1127,7 @@ class AgentLoop:
         self.sessions.save(session)
 
         if (mt := self.tools.get("message")):
-            from nanobot.agent.tools.message import MessageTool
+            from xcbot.agent.tools.message import MessageTool
             if isinstance(mt, MessageTool) and mt._sent_in_turn:
                 return None
 

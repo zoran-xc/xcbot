@@ -41,11 +41,11 @@ dns:
     geoip-code: CN
 
 proxy-providers:
-  nanobot_sub:
+  xcbot_sub:
     type: http
     url: "https://proxyinfo.net/api/v1/client/subscribe?token=799a33effeabd4efd124fd786caa672e"
     interval: 3600
-    path: ./providers/nanobot_sub.yaml
+    path: ./providers/xcbot_sub.yaml
     health-check:
       enable: true
       interval: 600
@@ -58,7 +58,7 @@ proxy-groups:
     proxies:
       - DIRECT
     use:
-      - nanobot_sub
+      - xcbot_sub
 
 rules:
   - GEOIP,CN,DIRECT

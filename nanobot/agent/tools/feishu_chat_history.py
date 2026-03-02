@@ -13,10 +13,10 @@ from typing import Any, TYPE_CHECKING
 import httpx
 from loguru import logger
 
-from nanobot.agent.tools.base import Tool
+from xcbot.agent.tools.base import Tool
 
 if TYPE_CHECKING:
-    from nanobot.config.schema import FeishuConfig
+    from xcbot.config.schema import FeishuConfig
 
 
 def _parse_time(value: str | int | float | None) -> int | None:
